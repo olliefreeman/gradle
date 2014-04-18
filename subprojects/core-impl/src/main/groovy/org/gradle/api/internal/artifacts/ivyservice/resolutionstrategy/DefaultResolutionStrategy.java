@@ -16,24 +16,25 @@
 
 package org.gradle.api.internal.artifacts.ivyservice.resolutionstrategy;
 
+import com.google.common.collect.ImmutableSet;
 import org.gradle.api.Action;
-import org.gradle.api.artifacts.ConflictResolution;
-import org.gradle.api.artifacts.DependencyResolveDetails;
-import org.gradle.api.artifacts.ModuleVersionSelector;
-import org.gradle.api.artifacts.ResolutionStrategy;
+import org.gradle.api.artifacts.*;
 import org.gradle.api.artifacts.cache.ResolutionRules;
-import org.gradle.internal.Actions;
+import org.gradle.api.internal.artifacts.DefaultModuleIdentifier;
 import org.gradle.api.internal.artifacts.DependencyResolveDetailsInternal;
+import org.gradle.api.internal.artifacts.configurations.DependencyConflictDetails;
+import org.gradle.api.internal.artifacts.configurations.DependencyConflictResolver;
 import org.gradle.api.internal.artifacts.configurations.ResolutionStrategyInternal;
 import org.gradle.api.internal.artifacts.dsl.ModuleVersionSelectorParsers;
+import org.gradle.api.specs.Spec;
+import org.gradle.internal.Actions;
 import org.gradle.internal.typeconversion.NormalizedTimeUnit;
 import org.gradle.internal.typeconversion.TimeUnitsParser;
 
-import java.util.Collection;
-import java.util.LinkedHashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+import static java.util.Arrays.asList;
 import static org.gradle.util.GUtil.flattenElements;
 
 public class DefaultResolutionStrategy implements ResolutionStrategyInternal {
@@ -43,6 +44,7 @@ public class DefaultResolutionStrategy implements ResolutionStrategyInternal {
 
     final Set<Action<? super DependencyResolveDetails>> dependencyResolveRules;
     private final DefaultCachePolicy cachePolicy;
+    private final List<DependencyConflictResolver> dependencyConflictResolvers = new LinkedList<DependencyConflictResolver>();
 
     public DefaultResolutionStrategy() {
         this(new DefaultCachePolicy(), new LinkedHashSet<Action<? super DependencyResolveDetails>>());
@@ -123,5 +125,15 @@ public class DefaultResolutionStrategy implements ResolutionStrategyInternal {
         }
         out.setForcedModules(getForcedModules());
         return out;
+    }
+
+    public List<DependencyConflictResolver> getDependencyConflictResolvers() {
+        return dependencyConflictResolvers;
+    }
+
+    public void conflict(Action<DependencyConflictDetails> detailsAction) {
+        DefaultDependencyConflictDetails details = new DefaultDependencyConflictDetails();
+        detailsAction.execute(details);
+        this.dependencyConflictResolvers.add(details);
     }
 }

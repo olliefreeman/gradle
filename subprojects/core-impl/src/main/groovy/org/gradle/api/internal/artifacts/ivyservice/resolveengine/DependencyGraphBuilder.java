@@ -35,6 +35,7 @@ import org.gradle.api.internal.artifacts.metadata.ComponentArtifactMetaData;
 import org.gradle.api.internal.artifacts.metadata.ComponentMetaData;
 import org.gradle.api.internal.artifacts.metadata.ConfigurationMetaData;
 import org.gradle.api.internal.artifacts.metadata.DependencyMetaData;
+import org.gradle.api.specs.Spec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,17 +48,19 @@ public class DependencyGraphBuilder {
     private final InternalConflictResolver conflictResolver;
     private final ModuleToModuleVersionResolver moduleResolver;
     private final ArtifactResolver artifactResolver;
+    private final ModuleConflictHandler moduleConflictHandler;
 
     public DependencyGraphBuilder(DependencyToModuleVersionIdResolver dependencyResolver,
                                   ModuleToModuleVersionResolver moduleResolver,
                                   ArtifactResolver artifactResolver,
-                                  ModuleConflictResolver conflictResolver,
+                                  ModuleConflictHandler moduleConflictHandler,
                                   DependencyToConfigurationResolver dependencyToConfigurationResolver) {
         this.dependencyResolver = dependencyResolver;
         this.moduleResolver = moduleResolver;
         this.artifactResolver = artifactResolver;
+        this.moduleConflictHandler = moduleConflictHandler;
         this.dependencyToConfigurationResolver = dependencyToConfigurationResolver;
-        this.conflictResolver = new InternalConflictResolver(conflictResolver);
+        this.conflictResolver = new InternalConflictResolver(moduleConflictHandler);
     }
 
     public void resolve(ConfigurationInternal configuration,
@@ -66,7 +69,8 @@ public class DependencyGraphBuilder {
         DefaultBuildableComponentResolveResult rootModule = new DefaultBuildableComponentResolveResult();
         moduleResolver.resolve(configuration.getModule(), configuration.getAll(), rootModule);
 
-        ResolveState resolveState = new ResolveState(rootModule, configuration.getName(), dependencyResolver, dependencyToConfigurationResolver, artifactResolver, oldModelBuilder);
+        ResolveState resolveState = new ResolveState(rootModule, configuration.getName(), dependencyResolver, dependencyToConfigurationResolver,
+                artifactResolver, oldModelBuilder, moduleConflictHandler);
         traverseGraph(resolveState);
 
         assembleResult(resolveState, oldModelBuilder, newModelBuilder);
@@ -106,8 +110,7 @@ public class DependencyGraphBuilder {
                         ModuleResolveState module = resolveState.getModule(moduleId);
 
                         // A new module revision. Check for conflict
-                        Collection<ModuleVersionResolveState> versions = module.getVersions();
-                        if (versions.size() == 1) {
+                        if (!module.isConflicted()) {
                             // First version of this module. Select it for now
                             LOGGER.debug("Selecting new module version {}", moduleRevision);
                             module.select(moduleRevision);
@@ -134,8 +137,8 @@ public class DependencyGraphBuilder {
                 ModuleIdentifier moduleId = conflicts.iterator().next();
                 conflicts.remove(moduleId);
                 ModuleResolveState module = resolveState.getModule(moduleId);
-                ModuleVersionResolveState selected = conflictResolver.select(module.getVersions(), resolveState.root.moduleRevision);
-                LOGGER.debug("Selected {} from conflicting modules {}.", selected, module.getVersions());
+                ModuleVersionResolveState selected = conflictResolver.select(module.getConflictingVersions(), resolveState.root.moduleRevision);
+                LOGGER.debug("Selected {} from conflicting modules {}.", selected, module.versions);
 
                 // Restart each configuration. For the evicted configuration, this means moving incoming dependencies across to the
                 // matching selected configuration. For the select configuration, this mean traversing its dependencies.
@@ -332,6 +335,7 @@ public class DependencyGraphBuilder {
 
         public void restart(ModuleVersionResolveState selected) {
             targetModuleRevision = selected;
+            selector.restart(selected);
             attachToTargetConfigurations();
         }
 
@@ -424,13 +428,16 @@ public class DependencyGraphBuilder {
         private final ResolvedConfigurationBuilder builder;
         private final Set<ConfigurationNode> queued = new HashSet<ConfigurationNode>();
         private final LinkedList<ConfigurationNode> queue = new LinkedList<ConfigurationNode>();
+        private final ModuleConflictHandler moduleConflictHandler;
 
         public ResolveState(ComponentResolveResult rootResult, String rootConfigurationName, DependencyToModuleVersionIdResolver resolver,
-                            DependencyToConfigurationResolver dependencyToConfigurationResolver, ArtifactResolver artifactResolver, ResolvedConfigurationBuilder builder) {
+                            DependencyToConfigurationResolver dependencyToConfigurationResolver, ArtifactResolver artifactResolver,
+                            ResolvedConfigurationBuilder builder, ModuleConflictHandler moduleConflictHandler) {
             this.resolver = resolver;
             this.dependencyToConfigurationResolver = dependencyToConfigurationResolver;
             this.artifactResolver = artifactResolver;
             this.builder = builder;
+            this.moduleConflictHandler = moduleConflictHandler;
             ModuleVersionResolveState rootVersion = getRevision(rootResult.getId());
             rootVersion.setResolveResult(rootResult);
             root = new RootConfigurationNode(rootVersion, new ResolvedConfigurationIdentifier(rootVersion.id, rootConfigurationName), this);
@@ -448,7 +455,13 @@ public class DependencyGraphBuilder {
         }
 
         public ModuleVersionResolveState getRevision(ModuleVersionIdentifier id) {
-            return getModule(id.getModule()).getVersion(id);
+            ModuleResolveState moduleState = getModule(id.getModule());
+            ModuleVersionResolveState versionState = moduleState.getVersion(id);
+
+            Spec<ModuleIdentifier> conflictingModulesSelector = moduleConflictHandler.getModuleConflicts(id.getModule());
+            moduleState.setConflictingModulesSelector(conflictingModulesSelector);
+
+            return versionState;
         }
 
         public Collection<ConfigurationNode> getConfigurationNodes() {
@@ -505,6 +518,16 @@ public class DependencyGraphBuilder {
                 queue.addFirst(configuration);
             }
         }
+
+        public List<ModuleIdentifier> getModules(Spec<ModuleIdentifier> selector) {
+            List<ModuleIdentifier> out = new LinkedList<ModuleIdentifier>();
+            for (ModuleIdentifier m : modules.keySet()) {
+                if (selector.isSatisfiedBy(m)) {
+                    out.add(m);
+                }
+            }
+            return out;
+        }
     }
 
     enum ModuleState {
@@ -521,9 +544,9 @@ public class DependencyGraphBuilder {
         final ModuleIdentifier id;
         final Set<DependencyEdge> unattachedDependencies = new LinkedHashSet<DependencyEdge>();
         final Map<ModuleVersionIdentifier, ModuleVersionResolveState> versions = new LinkedHashMap<ModuleVersionIdentifier, ModuleVersionResolveState>();
-        final Set<ModuleVersionSelectorResolveState> selectors = new HashSet<ModuleVersionSelectorResolveState>();
         final ResolveState resolveState;
         ModuleVersionResolveState selected;
+        private Spec<ModuleIdentifier> conflictingModulesSelector;
 
         private ModuleResolveState(ModuleIdentifier id, ResolveState resolveState) {
             this.id = id;
@@ -533,10 +556,6 @@ public class DependencyGraphBuilder {
         @Override
         public String toString() {
             return id.toString();
-        }
-
-        public Collection<ModuleVersionResolveState> getVersions() {
-            return versions.values();
         }
 
         public void select(ModuleVersionResolveState selected) {
@@ -562,9 +581,6 @@ public class DependencyGraphBuilder {
             for (ModuleVersionResolveState version : versions.values()) {
                 version.restart(selected);
             }
-            for (ModuleVersionSelectorResolveState selector : selectors) {
-                selector.restart(selected);
-            }
             for (DependencyEdge dependency : new ArrayList<DependencyEdge>(unattachedDependencies)) {
                 dependency.restart(selected);
             }
@@ -589,8 +605,22 @@ public class DependencyGraphBuilder {
             return moduleRevision;
         }
 
-        public void addSelector(ModuleVersionSelectorResolveState selector) {
-            selectors.add(selector);
+        public boolean isConflicted() {
+            return versions.size() != 1 || resolveState.getModules(conflictingModulesSelector).size() > 0;
+        }
+
+        public Collection<ModuleVersionResolveState> getConflictingVersions() {
+            Set<ModuleVersionResolveState> conflicting = new HashSet<ModuleVersionResolveState>();
+            conflicting.addAll(versions.values());
+            //also add all versions from conflicting modules
+            for (ModuleIdentifier conflictingModule : resolveState.getModules(conflictingModulesSelector)) {
+                conflicting.addAll(resolveState.getModule(conflictingModule).versions.values());
+            }
+            return conflicting;
+        }
+
+        public void setConflictingModulesSelector(Spec<ModuleIdentifier> conflictingModulesSelector) {
+            this.conflictingModulesSelector = conflictingModulesSelector;
         }
     }
 
@@ -952,7 +982,6 @@ public class DependencyGraphBuilder {
             targetModuleRevision.addResolver(this);
             targetModuleRevision.selectionReason = idResolveResult.getSelectionReason();
             targetModule = targetModuleRevision.module;
-            targetModule.addSelector(this);
 
             return targetModuleRevision;
         }

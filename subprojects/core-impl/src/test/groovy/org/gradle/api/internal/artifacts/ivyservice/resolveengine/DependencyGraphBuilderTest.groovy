@@ -43,7 +43,7 @@ import static org.gradle.api.internal.artifacts.ivyservice.IvyUtil.createModuleR
 
 class DependencyGraphBuilderTest extends Specification {
     final ConfigurationInternal configuration = Mock()
-    final ModuleConflictResolver conflictResolver = Mock()
+    final ModuleConflictHandler conflictResolver = Mock()
     final DependencyToModuleVersionIdResolver dependencyResolver = Mock()
     final ArtifactResolver artifactResolver = Mock()
     final ResolutionResultBuilder resultBuilder = Mock()

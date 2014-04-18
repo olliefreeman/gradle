@@ -100,7 +100,9 @@ public class DefaultDependencyResolver implements ArtifactDependencyResolver {
                 }
                 conflictResolver = new VersionSelectionReasonResolver(conflictResolver);
 
-                DependencyGraphBuilder builder = new DependencyGraphBuilder(idResolver, projectDependencyResolver, artifactResolver, conflictResolver, new DefaultDependencyToConfigurationResolver());
+                ModuleConflictHandler handler = new DefaultModuleConflictHandler(conflictResolver, configuration.getResolutionStrategy().getDependencyConflictResolvers());
+
+                DependencyGraphBuilder builder = new DependencyGraphBuilder(idResolver, projectDependencyResolver, artifactResolver, handler, new DefaultDependencyToConfigurationResolver());
 
                 StoreSet stores = storeFactory.createStoreSet();
 
