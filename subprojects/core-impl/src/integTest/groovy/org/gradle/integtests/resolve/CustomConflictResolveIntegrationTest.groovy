@@ -27,10 +27,11 @@ class CustomConflictResolveIntegrationTest extends AbstractIntegrationSpec {
                 foo "com.google.collections:google-collections:1.0"
                 foo "com.google.guava:guava:16.0.1"
                 foo "com.google.guava:guava:15.0.0"
-            }
-            configurations.foo.resolutionStrategy.conflict {
-                modules('com.google.guava:guava', 'com.google.collections:google-collections')
-                resolution { it.name == 'guava' }
+                components {
+                    replacements {
+                        from('com.google.collections:google-collections').into('com.google.guava:guava')
+                    }
+                }
             }
             task check << {
                 assert configurations.foo.files*.name == ['guava-16.0.1.jar']
