@@ -19,6 +19,7 @@ package org.gradle.api.internal.tasks.compile.incremental;
 import org.gradle.api.file.FileTree;
 import org.gradle.api.internal.file.FileOperations;
 import org.gradle.api.internal.tasks.compile.JavaCompileSpec;
+import org.gradle.api.internal.tasks.compile.incremental.analyzer.ClassDependenciesAnalyzer;
 import org.gradle.api.internal.tasks.compile.incremental.deps.ClassDependencyInfo;
 import org.gradle.api.internal.tasks.compile.incremental.deps.ClassDependencyInfoExtractor;
 import org.gradle.api.internal.tasks.compile.incremental.deps.ClassDependencyInfoWriter;
@@ -34,27 +35,26 @@ public class ClassDependencyInfoUpdater {
 
     private final ClassDependencyInfoWriter writer;
     private final FileOperations fileOperations;
-    private final ClassDependencyInfoExtractor extractor;
+    private ClassDependenciesAnalyzer analyzer;
 
-    public ClassDependencyInfoUpdater(ClassDependencyInfoWriter writer, FileOperations fileOperations, ClassDependencyInfoExtractor extractor) {
+    public ClassDependencyInfoUpdater(ClassDependencyInfoWriter writer, FileOperations fileOperations, ClassDependenciesAnalyzer analyzer) {
         this.writer = writer;
         this.fileOperations = fileOperations;
-        this.extractor = extractor;
+        this.analyzer = analyzer;
     }
 
-    public ClassDependencyInfo updateInfo(JavaCompileSpec spec, WorkResult compilationResult) {
+    public void updateInfo(JavaCompileSpec spec, WorkResult compilationResult) {
         if (compilationResult instanceof RecompilationNotNecessary) {
-            //performance tweak
-            //update not necessary. Reuse dependency info loaded for compilation
-            return ((RecompilationNotNecessary) compilationResult).getInitialDependencyInfo();
-        } else {
-            Clock clock = new Clock();
-            FileTree tree = fileOperations.fileTree(spec.getDestinationDir());
-            tree.visit(extractor);
-            ClassDependencyInfo info = extractor.getDependencyInfo();
-            writer.writeInfo(info);
-            LOG.lifecycle("Performed class dependency analysis in {}, wrote results into {}", clock.getTime(), writer);
-            return info;
+            //performance tweak, update not necessary
+            return;
         }
+
+        Clock clock = new Clock();
+        FileTree tree = fileOperations.fileTree(spec.getDestinationDir());
+        ClassDependencyInfoExtractor extractor = new ClassDependencyInfoExtractor(analyzer);
+        tree.visit(extractor);
+        ClassDependencyInfo info = extractor.getDependencyInfo();
+        writer.writeInfo(info);
+        LOG.lifecycle("Performed class dependency analysis in {}, wrote results into {}", clock.getTime(), writer);
     }
 }

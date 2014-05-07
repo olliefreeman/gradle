@@ -54,14 +54,14 @@ class SelectiveCompiler implements org.gradle.api.internal.tasks.compile.Compile
         incrementalCompilationInitilizer.initializeCompilation(spec, recompilationSpec.getClassNames());
         if (spec.getSource().isEmpty()) {
             LOG.lifecycle("Detection of classes for compilation took {}. No recompilation is needed!", clock.getTime());
-            return new RecompilationNotNecessary(recompilationSpec);
+            return new RecompilationNotNecessary();
         }
 
         try {
             //use the original compiler to avoid cleaning up all the files
             return cleaningCompiler.getCompiler().execute(spec);
         } finally {
-            LOG.lifecycle("Detection of classes for compilation ({}) plus the compilation took {}.", recompilationSpec.getClassNames().size(), clock.getTime());
+            LOG.lifecycle("Detection of {} classes for compilation and the compilation took {}.", recompilationSpec.getClassNames().size(), clock.getTime());
         }
     }
 }

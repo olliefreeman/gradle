@@ -17,23 +17,26 @@
 package org.gradle.api.internal.externalresource.transport;
 
 
+import org.gradle.api.Transformer;
 import org.gradle.api.internal.externalresource.ExternalResource;
-import org.gradle.api.internal.externalresource.local.LocallyAvailableResourceCandidates;
 import org.gradle.api.internal.externalresource.metadata.ExternalResourceMetaData;
-import org.gradle.api.internal.externalresource.transfer.CacheAwareExternalResourceAccessor;
 import org.gradle.api.internal.externalresource.transfer.ExternalResourceAccessor;
 import org.gradle.api.internal.externalresource.transfer.ExternalResourceLister;
 import org.gradle.api.internal.externalresource.transfer.ExternalResourceUploader;
 import org.gradle.api.internal.file.TemporaryFileProvider;
+import org.gradle.api.internal.resource.ResourceException;
 import org.gradle.internal.Factory;
 import org.gradle.internal.UncheckedException;
-import org.gradle.util.GFileUtils;
 import org.gradle.internal.hash.HashUtil;
 import org.gradle.internal.hash.HashValue;
+import org.gradle.util.CollectionUtils;
+import org.gradle.util.GFileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 
 public class DefaultExternalResourceRepository implements ExternalResourceRepository {
@@ -44,29 +47,21 @@ public class DefaultExternalResourceRepository implements ExternalResourceReposi
     private final ExternalResourceUploader uploader;
     private final ExternalResourceLister lister;
 
-    private final CacheAwareExternalResourceAccessor cacheAwareAccessor;
-
     public DefaultExternalResourceRepository(String name, ExternalResourceAccessor accessor, ExternalResourceUploader uploader,
-                                             ExternalResourceLister lister, TemporaryFileProvider temporaryFileProvider,
-                                             CacheAwareExternalResourceAccessor cacheAwareAccessor) {
+                                             ExternalResourceLister lister, TemporaryFileProvider temporaryFileProvider) {
         this.name = name;
         this.accessor = accessor;
         this.uploader = uploader;
         this.lister = lister;
         this.temporaryFileProvider = temporaryFileProvider;
-        this.cacheAwareAccessor = cacheAwareAccessor;
     }
 
     public ExternalResource getResource(String source) throws IOException {
-        return accessor.getResource(source);
-    }
-
-    public ExternalResource getResource(String source, LocallyAvailableResourceCandidates localCandidates) throws IOException {
-        return cacheAwareAccessor.getResource(source, localCandidates);
+        return accessor.getResource(toUri(source));
     }
 
     public ExternalResourceMetaData getResourceMetaData(String source) throws IOException {
-        return accessor.getMetaData(source);
+        return accessor.getMetaData(toUri(source));
     }
 
     public void put(File source, String destination) throws IOException {
@@ -107,7 +102,7 @@ public class DefaultExternalResourceRepository implements ExternalResourceReposi
                         throw UncheckedException.throwAsUncheckedException(e);
                     }
                 }
-            }, source.length(), destination);
+            }, source.length(), new URI(destination));
         } catch (IOException e) {
             throw e;
         } catch (Exception e) {
@@ -116,10 +111,28 @@ public class DefaultExternalResourceRepository implements ExternalResourceReposi
     }
 
     public List<String> list(String parent) throws IOException {
-        return lister.list(parent);
+        List<URI> children = lister.list(toUri(parent));
+        if (children == null) {
+            return null;
+        }
+        return CollectionUtils.collect(children, new Transformer<String, URI>() {
+            public String transform(URI original) {
+                return original.toString();
+            }
+        });
     }
 
     public String toString() {
         return name;
+    }
+
+    private URI toUri(String location) {
+        URI uri;
+        try {
+            uri = new URI(location);
+        } catch (URISyntaxException e) {
+            throw new ResourceException(String.format("Unable to create URI from string '%s' ", location), e);
+        }
+        return uri;
     }
 }

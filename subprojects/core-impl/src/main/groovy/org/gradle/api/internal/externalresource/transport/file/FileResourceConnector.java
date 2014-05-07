@@ -18,6 +18,7 @@ package org.gradle.api.internal.externalresource.transport.file;
 import org.apache.commons.io.IOUtils;
 import org.gradle.api.internal.externalresource.DefaultLocallyAvailableExternalResource;
 import org.gradle.api.internal.externalresource.ExternalResource;
+import org.gradle.api.internal.externalresource.LocallyAvailableExternalResource;
 import org.gradle.api.internal.externalresource.metadata.ExternalResourceMetaData;
 import org.gradle.api.internal.externalresource.transfer.ExternalResourceAccessor;
 import org.gradle.api.internal.externalresource.transfer.ExternalResourceLister;
@@ -31,18 +32,19 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
 public class FileResourceConnector implements ExternalResourceLister, ExternalResourceAccessor, ExternalResourceUploader {
-    public List<String> list(String parent) throws IOException {
+    public List<URI> list(URI parent) throws IOException {
         File dir = getFile(parent);
         if (dir.exists() && dir.isDirectory()) {
             String[] names = dir.list();
             if (names != null) {
-                List<String> ret = new ArrayList<String>(names.length);
+                List<URI> ret = new ArrayList<URI>(names.length);
                 for (String name : names) {
-                    ret.add(parent + '/' + name);
+                    ret.add(parent.resolve(name));
                 }
                 return ret;
             }
@@ -50,7 +52,7 @@ public class FileResourceConnector implements ExternalResourceLister, ExternalRe
         return null;
     }
 
-    public void upload(Factory<InputStream> source, Long contentLength, String destination) throws IOException {
+    public void upload(Factory<InputStream> source, Long contentLength, URI destination) throws IOException {
         File target = getFile(destination);
         if (!target.canWrite()) {
             target.delete();
@@ -69,29 +71,25 @@ public class FileResourceConnector implements ExternalResourceLister, ExternalRe
         }
     }
 
-    public ExternalResource getResource(String location) throws IOException {
-        File localFile = getFile(location);
+    public LocallyAvailableExternalResource getResource(URI uri) throws IOException {
+        File localFile = getFile(uri);
         if (!localFile.exists()) {
             return null;
         }
-        return new DefaultLocallyAvailableExternalResource(location, new DefaultLocallyAvailableResource(localFile));
+        return new DefaultLocallyAvailableExternalResource(uri, new DefaultLocallyAvailableResource(localFile));
     }
 
-    public ExternalResourceMetaData getMetaData(String location) throws IOException {
+    public ExternalResourceMetaData getMetaData(URI location) throws IOException {
         ExternalResource resource = getResource(location);
         return resource == null ? null : resource.getMetaData();
     }
 
-    public HashValue getResourceSha1(String location) {
+    public HashValue getResourceSha1(URI location) {
         // TODO Read sha1 from published .sha1 file
         return null;
     }
 
-    private static File getFile(String absolutePath) {
-        File f = new File(absolutePath);
-        if (!f.isAbsolute()) {
-            throw new IllegalArgumentException("Filename must be absolute: " + absolutePath);
-        }
-        return f;
+    private static File getFile(URI uri) {
+        return new File(uri);
     }
 }

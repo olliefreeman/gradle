@@ -20,11 +20,8 @@ import org.gradle.api.internal.file.FileOperations;
 import org.gradle.api.internal.tasks.compile.CleaningJavaCompiler;
 import org.gradle.api.internal.tasks.compile.Compiler;
 import org.gradle.api.internal.tasks.compile.JavaCompileSpec;
-import org.gradle.api.internal.tasks.compile.incremental.analyzer.ClassDependenciesAnalyzer;
-import org.gradle.api.internal.tasks.compile.incremental.deps.ClassDependencyInfoExtractor;
 import org.gradle.api.internal.tasks.compile.incremental.deps.ClassDependencyInfoSerializer;
-import org.gradle.api.internal.tasks.compile.incremental.jar.ClasspathJarFinder;
-import org.gradle.api.internal.tasks.compile.incremental.jar.JarSnapshotFeeder;
+import org.gradle.api.internal.tasks.compile.incremental.jar.JarSnapshotsMaker;
 import org.gradle.api.internal.tasks.compile.incremental.recomp.RecompilationSpecProvider;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
@@ -33,30 +30,32 @@ import org.gradle.api.tasks.incremental.IncrementalTaskInputs;
 public class IncrementalCompilationSupport {
 
     private static final Logger LOG = Logging.getLogger(IncrementalCompilationSupport.class);
-    private final JarSnapshotFeeder jarSnapshotFeeder;
+    private final JarSnapshotsMaker jarSnapshotsMaker;
     private final ClassDependencyInfoSerializer dependencyInfoSerializer;
     private final FileOperations fileOperations;
-    private final ClassDependenciesAnalyzer analyzer;
     private final CleaningJavaCompiler cleaningCompiler;
     private final String displayName;
     private final RecompilationSpecProvider staleClassDetecter;
+    private final ClassDependencyInfoUpdater classDependencyInfoUpdater;
+    private final CompilationSourceDirs sourceDirs;
 
-    public IncrementalCompilationSupport(JarSnapshotFeeder jarSnapshotFeeder, ClassDependencyInfoSerializer dependencyInfoSerializer,
-                                         FileOperations fileOperations, ClassDependenciesAnalyzer analyzer,
-                                         CleaningJavaCompiler cleaningCompiler, String displayName, RecompilationSpecProvider staleClassDetecter) {
-        this.jarSnapshotFeeder = jarSnapshotFeeder;
+    public IncrementalCompilationSupport(JarSnapshotsMaker jarSnapshotsMaker, ClassDependencyInfoSerializer dependencyInfoSerializer,
+                                         FileOperations fileOperations, CleaningJavaCompiler cleaningCompiler, String displayName,
+                                         RecompilationSpecProvider staleClassDetecter, ClassDependencyInfoUpdater classDependencyInfoUpdater,
+                                         CompilationSourceDirs sourceDirs) {
+        this.jarSnapshotsMaker = jarSnapshotsMaker;
         this.dependencyInfoSerializer = dependencyInfoSerializer;
         this.fileOperations = fileOperations;
-        this.analyzer = analyzer;
         this.cleaningCompiler = cleaningCompiler;
         this.displayName = displayName;
         this.staleClassDetecter = staleClassDetecter;
+        this.classDependencyInfoUpdater = classDependencyInfoUpdater;
+        this.sourceDirs = sourceDirs;
     }
 
-    public Compiler<JavaCompileSpec> prepareCompiler(final IncrementalTaskInputs inputs, final CompilationSourceDirs sourceDirs) {
+    public Compiler<JavaCompileSpec> prepareCompiler(final IncrementalTaskInputs inputs) {
         final Compiler<JavaCompileSpec> compiler = getCompiler(inputs, sourceDirs);
-        ClassDependencyInfoUpdater updater = new ClassDependencyInfoUpdater(dependencyInfoSerializer, fileOperations, new ClassDependencyInfoExtractor(analyzer));
-        return new IncrementalCompilationFinalizer(compiler, jarSnapshotFeeder, new ClasspathJarFinder(fileOperations), updater);
+        return new IncrementalCompilationFinalizer(compiler, jarSnapshotsMaker, classDependencyInfoUpdater);
     }
 
     private Compiler<JavaCompileSpec> getCompiler(IncrementalTaskInputs inputs, CompilationSourceDirs sourceDirs) {

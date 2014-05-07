@@ -16,11 +16,14 @@
 
 package org.gradle.api.internal.externalresource.transfer;
 
+import org.gradle.api.Nullable;
+
 import java.io.IOException;
+import java.net.URI;
 import java.util.List;
 
 public interface ExternalResourceLister {
-
-    public List<String> list(String parent) throws IOException;
+    @Nullable
+    public List<URI> list(URI parent) throws IOException;
 
 }

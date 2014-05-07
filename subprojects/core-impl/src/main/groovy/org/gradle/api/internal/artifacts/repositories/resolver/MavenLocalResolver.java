@@ -19,10 +19,10 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.ResolverStrategy;
 import org.gradle.api.internal.artifacts.metadata.MavenModuleVersionMetaData;
 import org.gradle.api.internal.artifacts.metadata.ModuleVersionArtifactMetaData;
-import org.gradle.api.internal.artifacts.metadata.ModuleVersionMetaData;
 import org.gradle.api.internal.artifacts.metadata.MutableModuleVersionMetaData;
 import org.gradle.api.internal.artifacts.repositories.transport.RepositoryTransport;
 import org.gradle.api.internal.externalresource.local.LocallyAvailableResourceFinder;
+import org.gradle.internal.filestore.FileStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,30 +33,28 @@ public class MavenLocalResolver extends MavenResolver {
 
     public MavenLocalResolver(String name, URI rootUri, RepositoryTransport transport,
                               LocallyAvailableResourceFinder<ModuleVersionArtifactMetaData> locallyAvailableResourceFinder,
-                              ResolverStrategy resolverStrategy) {
-        super(name, rootUri, transport, locallyAvailableResourceFinder, resolverStrategy);
+                              ResolverStrategy resolverStrategy, FileStore<ModuleVersionArtifactMetaData> artifactFileStore) {
+        super(name, rootUri, transport, locallyAvailableResourceFinder, resolverStrategy, artifactFileStore);
     }
 
     @Override
     protected MutableModuleVersionMetaData parseMetaDataFromArtifact(ModuleComponentIdentifier moduleComponentIdentifier, ExternalResourceArtifactResolver artifactResolver) {
         MutableModuleVersionMetaData metaData = super.parseMetaDataFromArtifact(moduleComponentIdentifier, artifactResolver);
 
-        if (isOrphanedPom(metaData, artifactResolver)) {
+        if (isOrphanedPom(mavenMetaData(metaData), artifactResolver)) {
             return null;
         }
         return metaData;
     }
 
-    private boolean isOrphanedPom(ModuleVersionMetaData metaData, ExternalResourceArtifactResolver artifactResolver) {
-        MavenModuleVersionMetaData mavenMetaData = metaData.getMavenMetaData();
-
-        if (mavenMetaData.isPomPackaging()) {
+    private boolean isOrphanedPom(MavenModuleVersionMetaData metaData, ExternalResourceArtifactResolver artifactResolver) {
+        if (metaData.isPomPackaging()) {
             return false;
         }
 
         // check custom packaging
-        if(!mavenMetaData.isKnownJarPackaging()) {
-            ModuleVersionArtifactMetaData customArtifactMetaData = metaData.artifact(mavenMetaData.getPackaging(), mavenMetaData.getPackaging(), null);
+        if(!metaData.isKnownJarPackaging()) {
+            ModuleVersionArtifactMetaData customArtifactMetaData = metaData.artifact(metaData.getPackaging(), metaData.getPackaging(), null);
 
             if(artifactResolver.artifactExists(customArtifactMetaData)) {
                 return false;

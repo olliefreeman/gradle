@@ -18,19 +18,22 @@ package org.gradle.api.internal.tasks.compile.incremental.jar;
 
 import org.gradle.api.internal.tasks.compile.incremental.deps.DefaultDependentsSet;
 import org.gradle.api.internal.tasks.compile.incremental.deps.DependentsSet;
+import org.gradle.api.internal.tasks.compile.incremental.model.PreviousCompilation;
 import org.gradle.api.tasks.incremental.InputFileDetails;
 
 public class JarChangeDependentsFinder {
 
-    private JarSnapshotFeeder jarSnapshotFeeder;
+    private JarSnapshotter jarSnapshotter;
+    private PreviousCompilation previousCompilation;
 
-    public JarChangeDependentsFinder(JarSnapshotFeeder jarSnapshotFeeder) {
-        this.jarSnapshotFeeder = jarSnapshotFeeder;
+    public JarChangeDependentsFinder(JarSnapshotter jarSnapshotter, PreviousCompilation previousCompilation) {
+        this.jarSnapshotter = jarSnapshotter;
+        this.previousCompilation = previousCompilation;
     }
 
     //TODO SF coverage
     public DependentsSet getActualDependents(InputFileDetails jarChangeDetails, JarArchive jarArchive) {
-        JarSnapshot existing = jarSnapshotFeeder.changedJar(jarChangeDetails.getFile());
+        JarSnapshot existing = previousCompilation.getJarSnapshot(jarChangeDetails.getFile());
         if (jarChangeDetails.isAdded()) {
             return new DefaultDependentsSet();
         }
@@ -42,12 +45,24 @@ public class JarChangeDependentsFinder {
         }
 
         if (jarChangeDetails.isRemoved()) {
-            return new DefaultDependentsSet(true);
+            DependentsSet allClasses = existing.getAllClasses();
+            if (allClasses.isDependencyToAll()) {
+                //at least one of the classes in jar is a 'dependency-to-all'.
+                return allClasses;
+            }
+            //recompile all dependents of all the classes from jar
+            return previousCompilation.getDependents(allClasses.getDependentClasses());
         }
 
         if (jarChangeDetails.isModified()) {
-            JarSnapshot snapshotNoDeps = jarSnapshotFeeder.newSnapshotWithoutDependents(jarArchive);
-            return existing.getDependentsDelta(snapshotNoDeps);
+            JarSnapshot newSnapshot = jarSnapshotter.createSnapshot(jarArchive);
+            DependentsSet affectedClasses = newSnapshot.getAffectedClassesSince(existing);
+            if (affectedClasses.isDependencyToAll()) {
+                //at least one of the classes changed in the jar is a 'dependency-to-all'
+                return affectedClasses;
+            }
+            //recompile all dependents of the classes changed in the jar
+            return previousCompilation.getDependents(affectedClasses.getDependentClasses());
         }
 
         throw new IllegalArgumentException("Unknown input file details provided: " + jarChangeDetails);

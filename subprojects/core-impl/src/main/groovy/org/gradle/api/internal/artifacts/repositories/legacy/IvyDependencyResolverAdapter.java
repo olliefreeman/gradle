@@ -44,7 +44,7 @@ import java.util.Set;
 /**
  * A {@link org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ConfiguredModuleComponentRepository} wrapper around an Ivy {@link DependencyResolver}.
  */
-public class IvyDependencyResolverAdapter implements ConfiguredModuleComponentRepository, IvyAwareModuleVersionRepository {
+public class IvyDependencyResolverAdapter implements ConfiguredModuleComponentRepository, IvyAwareModuleComponentRepository {
     private static final Logger LOGGER = LoggerFactory.getLogger(IvyDependencyResolverAdapter.class);
     private final DownloadOptions downloadOptions = new DownloadOptions();
     private final String identifier;
@@ -132,9 +132,8 @@ public class IvyDependencyResolverAdapter implements ConfiguredModuleComponentRe
                         result.missing();
                     } else {
                         LOGGER.debug("Performed resolved of module '{}' in repository '{}': found", moduleComponent, getName());
-                        ModuleDescriptorAdapter metaData = new ModuleDescriptorAdapter(revision.getDescriptor());
+                        MutableModuleVersionMetaData metaData = new DefaultIvyModuleVersionMetaData(revision.getDescriptor());
                         metaData.setChanging(isChanging(revision));
-                        metaData.setIvyMetaData(new DefaultIvyModuleVersionMetaData(revision.getDescriptor().getExtraInfo()));
                         result.resolved(metaData, null);
                     }
                 } catch (ParseException e) {

@@ -23,14 +23,19 @@ import org.gradle.api.internal.artifacts.ivyservice.BuildableArtifactSetResolveR
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.BuildableModuleVersionMetaDataResolveResult;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ModuleComponentRepositoryAccess;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.ModuleSource;
+import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.DescriptorParseContext;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.GradlePomModuleDescriptorParser;
+import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.parser.MetaDataParser;
 import org.gradle.api.internal.artifacts.ivyservice.ivyresolve.strategy.ResolverStrategy;
 import org.gradle.api.internal.artifacts.metadata.*;
 import org.gradle.api.internal.artifacts.repositories.transport.RepositoryTransport;
 import org.gradle.api.internal.artifacts.result.metadata.MavenPomArtifact;
+import org.gradle.api.internal.externalresource.LocallyAvailableExternalResource;
 import org.gradle.api.internal.externalresource.local.LocallyAvailableResourceFinder;
 import org.gradle.api.internal.resource.ResourceNotFoundException;
 import org.gradle.api.resources.ResourceException;
+import org.gradle.internal.Transformers;
+import org.gradle.internal.filestore.FileStore;
 import org.gradle.util.DeprecationLogger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,35 +43,39 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.*;
 
-public class MavenResolver extends ExternalResourceResolver implements PatternBasedResolver {
+public class MavenResolver extends ExternalResourceResolver {
     private static final Logger LOGGER = LoggerFactory.getLogger(MavenResolver.class);
-    private final RepositoryTransport transport;
-    private final String root;
-    private final List<String> artifactRoots = new ArrayList<String>();
+    private final URI root;
+    private final List<URI> artifactRoots = new ArrayList<URI>();
     private String pattern = MavenPattern.M2_PATTERN;
     private boolean usepoms = true;
     private boolean useMavenMetadata = true;
     private final MavenMetadataLoader mavenMetaDataLoader;
+    private final MetaDataParser metaDataParser;
 
     public MavenResolver(String name, URI rootUri, RepositoryTransport transport,
                          LocallyAvailableResourceFinder<ModuleVersionArtifactMetaData> locallyAvailableResourceFinder,
-                         ResolverStrategy resolverStrategy) {
-        super(name, transport.getRepository(),
+                         ResolverStrategy resolverStrategy, FileStore<ModuleVersionArtifactMetaData> artifactFileStore) {
+        super(name, transport.isLocal(),
+                transport.getRepository(),
+                transport.getResourceAccessor(),
                 new ChainedVersionLister(new MavenVersionLister(transport.getRepository()), new ResourceVersionLister(transport.getRepository())),
-                locallyAvailableResourceFinder, new GradlePomModuleDescriptorParser(), resolverStrategy);
-        transport.configureCacheManager(this);
-
+                locallyAvailableResourceFinder,
+                resolverStrategy,
+                artifactFileStore);
+        this.metaDataParser = new GradlePomModuleDescriptorParser();
         this.mavenMetaDataLoader = new MavenMetadataLoader(transport.getRepository());
-        this.transport = transport;
-        this.root = transport.convertToPath(rootUri);
-
-        super.setM2compatible(true);
+        this.root = rootUri;
 
         // SNAPSHOT revisions are changing revisions
         setChangingMatcher(PatternMatcher.REGEXP);
         setChangingPattern(".*-SNAPSHOT");
 
         updatePatterns();
+    }
+
+    public String getRoot() {
+        return root.toString();
     }
 
     protected void doResolveComponentMetaData(DependencyMetaData dependency, ModuleComponentIdentifier moduleComponentIdentifier, BuildableModuleVersionMetaDataResolveResult result) {
@@ -108,34 +117,26 @@ public class MavenResolver extends ExternalResourceResolver implements PatternBa
         return super.createArtifactResolver(moduleSource);
     }
 
-    public void addArtifactLocation(URI baseUri, String pattern) {
-        if (pattern != null && pattern.length() > 0) {
-            throw new IllegalArgumentException("Maven Resolver only supports a single pattern. It cannot be provided on a per-location basis.");
-        }
-        artifactRoots.add(transport.convertToPath(baseUri));
-
+    public void addArtifactLocation(URI baseUri) {
+        artifactRoots.add(baseUri);
         updatePatterns();
     }
 
-    public void addDescriptorLocation(URI baseUri, String pattern) {
-        throw new UnsupportedOperationException("Cannot have multiple descriptor urls for MavenResolver");
-    }
-
-    private String getWholePattern() {
-        return root + pattern;
+    private M2ResourcePattern getWholePattern() {
+        return new M2ResourcePattern(root, pattern);
     }
 
     private void updatePatterns() {
         if (isUsepoms()) {
             setIvyPatterns(Collections.singletonList(getWholePattern()));
         } else {
-            setIvyPatterns(Collections.<String>emptyList());
+            setIvyPatterns(Collections.<ResourcePattern>emptyList());
         }
 
-        List<String> artifactPatterns = new ArrayList<String>();
+        List<ResourcePattern> artifactPatterns = new ArrayList<ResourcePattern>();
         artifactPatterns.add(getWholePattern());
-        for (String artifactRoot : artifactRoots) {
-            artifactPatterns.add(artifactRoot + pattern);
+        for (URI artifactRoot : artifactRoots) {
+            artifactPatterns.add(new M2ResourcePattern(artifactRoot, pattern));
         }
         setArtifactPatterns(artifactPatterns);
     }
@@ -150,7 +151,7 @@ public class MavenResolver extends ExternalResourceResolver implements PatternBa
     }
 
     private MavenUniqueSnapshotModuleSource findUniqueSnapshotVersion(ModuleComponentIdentifier module) {
-        String metadataLocation = toResourcePattern(getWholePattern()).toModuleVersionPath(module) + "/maven-metadata.xml";
+        String metadataLocation = getWholePattern().toModuleVersionPath(module) + "/maven-metadata.xml";
         MavenMetadata mavenMetadata = parseMavenMetadata(metadataLocation);
 
         if (mavenMetadata.timestamp != null) {
@@ -162,7 +163,7 @@ public class MavenResolver extends ExternalResourceResolver implements PatternBa
     }
 
     private MavenMetadata parseMavenMetadata(String metadataLocation) {
-        if (shouldUseMavenMetadata(pattern)) {
+        if (isUseMavenMetadata()) {
             try {
                 return mavenMetaDataLoader.load(metadataLocation);
             } catch (ResourceNotFoundException e) {
@@ -201,35 +202,9 @@ public class MavenResolver extends ExternalResourceResolver implements PatternBa
         }
     }
 
-    private boolean shouldUseMavenMetadata(String pattern) {
-        return isUseMavenMetadata() && pattern.endsWith(MavenPattern.M2_PATTERN);
-    }
-
-    public String getPattern() {
-        return pattern;
-    }
-
-    public void setPattern(String pattern) {
-        if (pattern == null) {
-            throw new NullPointerException("pattern must not be null");
-        }
-        this.pattern = pattern;
-        updatePatterns();
-    }
-
-    public String getRoot() {
-        return root;
-    }
-
-    public void setRoot(String root) {
-        throw new UnsupportedOperationException("Cannot configure root on mavenRepo. Use 'url' property instead.");
-    }
-
     @Override
-    public void setM2compatible(boolean compatible) {
-        if (!compatible) {
-            throw new IllegalArgumentException("Cannot set m2compatible = false on mavenRepo.");
-        }
+    public boolean isM2compatible() {
+        return true;
     }
 
     public ModuleComponentRepositoryAccess getLocalAccess() {
@@ -240,12 +215,23 @@ public class MavenResolver extends ExternalResourceResolver implements PatternBa
         return new MavenRemoteRepositoryAccess();
     }
 
+    @Override
+    protected MutableModuleVersionMetaData createMetaDataForDependency(DependencyMetaData dependency) {
+        return new DefaultMavenModuleVersionMetaData(dependency);
+    }
+
+    protected MutableModuleVersionMetaData parseMetaDataFromResource(LocallyAvailableExternalResource cachedResource, DescriptorParseContext context) {
+        return metaDataParser.parseMetaData(context, cachedResource);
+    }
+
+    protected static MavenModuleVersionMetaData mavenMetaData(ModuleVersionMetaData metaData) {
+        return Transformers.cast(MavenModuleVersionMetaData.class).transform(metaData);
+    }
+
     private class MavenLocalRepositoryAccess extends LocalRepositoryAccess {
         @Override
         protected void resolveConfigurationArtifacts(ModuleVersionMetaData module, ConfigurationMetaData configuration, BuildableArtifactSetResolveResult result) {
-            MavenModuleVersionMetaData mavenMetaData = module.getMavenMetaData();
-
-            if (mavenMetaData.isKnownJarPackaging()) {
+            if (mavenMetaData(module).isKnownJarPackaging()) {
                 ModuleVersionArtifactMetaData artifact = module.artifact("jar", "jar", null);
                 result.resolved(ImmutableSet.of(artifact));
             }
@@ -265,8 +251,7 @@ public class MavenResolver extends ExternalResourceResolver implements PatternBa
     private class MavenRemoteRepositoryAccess extends RemoteRepositoryAccess {
         @Override
         protected void resolveConfigurationArtifacts(ModuleVersionMetaData module, ConfigurationMetaData configuration, BuildableArtifactSetResolveResult result) {
-            MavenModuleVersionMetaData mavenMetaData = module.getMavenMetaData();
-
+            MavenModuleVersionMetaData mavenMetaData = mavenMetaData(module);
             if (mavenMetaData.isPomPackaging()) {
                 Set<ComponentArtifactMetaData> artifacts = new LinkedHashSet<ComponentArtifactMetaData>();
                 artifacts.addAll(findOptionalArtifacts(module, "jar", null));

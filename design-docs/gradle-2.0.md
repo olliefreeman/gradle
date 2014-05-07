@@ -6,9 +6,13 @@ list of ideas to consider before shipping Gradle 2.0.
 Note: for the change listed below, the old behaviour or feature to be removed should be deprecated in a Gradle 1.x release, probably no later than Gradle 1.9. Similarly
 for changes to behaviour.
 
-# Planned
+# Planned for 2.0
 
 The following stories are to be included in Gradle 2.0.
+
+## Un-deprecate using the packaging declared in a Maven POM to probe for the module artifacts
+
+Leave this behaviour in until the mechanisms to better infer the artifacts for a module have been implemented.
 
 ## Remove all features deprecated as at Gradle 1.12
 
@@ -36,15 +40,17 @@ allows us to implement new features and remove some internal complexity.
 * Remove Ivy version from the output of `gradle -v`.
 * Remove loopback resolver, ModuleVersionRepository -> Ivy adapter.
 
-## Remove the Gradle Open API implementation
+## Remove support for the Gradle Open API implementation (DONE)
 
 Now that we have reasonable tooling support via the tooling API, remove the Open API.
 
 * Implement a stub to fail with a reasonable error message when attempting to use Gradle from the Open API.
-* Remove the remaining Open API classes and project.
-* Add integration test coverage that using the openAPI fails with a reasonable error message.
+* Add integration test coverage that using the Open API fails with a reasonable error message.
 
-## Remove the `GradleLauncher` API
+Note that the `openAPI` project must still remain, so that the stubs fail in the appropriate way when used by Open API clients.
+This will be removed in Gradle 3.0.
+
+## Remove the `GradleLauncher` API (DONE)
 
 The public API for launching Gradle is now the tooling API. The `GradleBuild` task can also be used.
 
@@ -103,7 +109,7 @@ The current defaults for the outputs of tasks of type `Test` conflict with each 
   does not conflict with the default for any other `Test` task.
 * Change the default TestNG output directory.
 
-## Remove usages of JNA and JNA-Posix
+## Remove usages of JNA and JNA-Posix (DONE)
 
 Replace all usages of JNA and JNA-Posix with native-platform. Currently, this means that console support and
 UNIX file permissions with JVMs earlier than Java 7 will not be supported on the following platforms:
@@ -113,9 +119,14 @@ UNIX file permissions with JVMs earlier than Java 7 will not be supported on the
 
 ## Rename this spec
 
-# Candidates
+# Candidates for Gradle 3.0
 
 The following stories are candidates to be included in a major release of Gradle. Currently, they are *not* scheduled to be included in Gradle 2.0.
+
+## Remove the Gradle Open API stubs
+
+* Remove the remaining Open API interfaces and stubs.
+* Remove the `openApi` project.
 
 ## Remove `group` and `status` from project
 
@@ -192,7 +203,7 @@ types and to offer a more consistent DSL.
 * Move `Module` from public API (it's only used internally).
 * Move `Logging.ANT_IVY_2_SLF4J_LEVEL_MAPPER` from public API.
 * Move `AntGroovydoc` and `AntScalaDoc` from public API.
-* Move `BuildExceptionReporter`, `BuildResultLogger`, `TaskExecutionLogger` and `BuildLogger` from public API.
+* Move `BuildExceptionReporter`, `BuildResultLogger`, `TaskExecutionLogger` and `BuildLogger` out of the public API.
 
 ## Remove support for convention objects
 
@@ -207,7 +218,7 @@ Extension objects have been available for over 2 years and are now an establishe
   `ConfigurationContainer`, `TaskCollection`.
 * Remove the specialised methods such as `whenTaskAdded()` from `PluginCollection`, `TaskCollection`
 * Remove the `extends T` upper bound on the type variable of `DomainObjectCollection.withType()`.
-* Remove the type varable from `ReportContainer`
+* Remove the type variable from `ReportContainer`
 * Remove unused constants from `ArtifactRepositoryContainer`
 * Move `ReportContainer.ImmutableViolationException` to make top level.
 
@@ -222,6 +233,7 @@ Extension objects have been available for over 2 years and are now an establishe
 ## Invocation API tidy-ups
 
 * Remove the public `StartParameter` constructor.
+* Remove the public `StartParameter` constants, `GRADLE_USER_HOME_PROPERTY_KEY` and `GRADLE_USER_HOME_PROPERTY_KEY`.
 * Change `StartParameter` into an interface.
 
 ## Misc API tidy-ups
@@ -258,19 +270,5 @@ which are not loaded by Gradle, such as the classes under test.
 
 ## build.gradle in a multiproject build
 
-* A Gradle best pattern is to name the gradle file to be the same name as the subproject. 
-* In Gradle 2.0, let's support this out of the box, possibly as a preference to `build.gradle`, and maybe drop support for `build.gradle` in subprojects.
-
-## Why remind people about Maven?
-
-Change from:
-
-    repositories {
-        mavenCentral()
-    }
-
-to:
-
-    repositories {
-        central()
-    }
+* A Gradle best pattern is to name the gradle file to be the same name as the subproject.
+* Let's support this out of the box, possibly as a preference to `build.gradle`, and maybe drop support for `build.gradle` in subprojects.

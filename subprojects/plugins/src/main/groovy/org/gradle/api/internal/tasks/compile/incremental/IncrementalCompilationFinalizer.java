@@ -18,39 +18,27 @@ package org.gradle.api.internal.tasks.compile.incremental;
 
 import org.gradle.api.internal.tasks.compile.Compiler;
 import org.gradle.api.internal.tasks.compile.JavaCompileSpec;
-import org.gradle.api.internal.tasks.compile.incremental.deps.ClassDependencyInfo;
-import org.gradle.api.internal.tasks.compile.incremental.jar.ClasspathJarFinder;
-import org.gradle.api.internal.tasks.compile.incremental.jar.JarSnapshotFeeder;
-import org.gradle.api.logging.Logger;
-import org.gradle.api.logging.Logging;
+import org.gradle.api.internal.tasks.compile.incremental.jar.JarSnapshotsMaker;
 import org.gradle.api.tasks.WorkResult;
-import org.gradle.util.Clock;
 
 class IncrementalCompilationFinalizer implements Compiler<JavaCompileSpec> {
 
-    private static final Logger LOG = Logging.getLogger(IncrementalCompilationFinalizer.class);
-
     private final Compiler<JavaCompileSpec> delegate;
-    private final JarSnapshotFeeder jarSnapshotFeeder;
-    private final ClasspathJarFinder classpathJarFinder;
-    private final ClassDependencyInfoUpdater updater;
+    private final JarSnapshotsMaker jarSnapshotsMaker;
+    private final ClassDependencyInfoUpdater dependencyInfoUpdater;
 
-    public IncrementalCompilationFinalizer(Compiler<JavaCompileSpec> delegate, JarSnapshotFeeder jarSnapshotFeeder,
-                                           ClasspathJarFinder classpathJarFinder, ClassDependencyInfoUpdater updater) {
+    public IncrementalCompilationFinalizer(Compiler<JavaCompileSpec> delegate, JarSnapshotsMaker jarSnapshotsMaker,
+                                           ClassDependencyInfoUpdater dependencyInfoUpdater) {
         this.delegate = delegate;
-        this.jarSnapshotFeeder = jarSnapshotFeeder;
-        this.classpathJarFinder = classpathJarFinder;
-        this.updater = updater;
+        this.jarSnapshotsMaker = jarSnapshotsMaker;
+        this.dependencyInfoUpdater = dependencyInfoUpdater;
     }
 
     public WorkResult execute(JavaCompileSpec spec) {
         WorkResult out = delegate.execute(spec);
 
-        ClassDependencyInfo info = updater.updateInfo(spec, out);
-
-        Clock clock = new Clock();
-        jarSnapshotFeeder.storeJarSnapshots(classpathJarFinder.findJarArchives(spec.getClasspath()), info);
-        LOG.lifecycle("Created and written jar snapshots in {}.", clock.getTime());
+        dependencyInfoUpdater.updateInfo(spec, out);
+        jarSnapshotsMaker.storeJarSnapshots(spec.getClasspath());
 
         return out;
     }

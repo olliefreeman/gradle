@@ -16,23 +16,9 @@
 
 package org.gradle.integtests.resolve.ivy
 
-import org.gradle.integtests.fixtures.AbstractDependencyResolutionTest
-import org.gradle.test.fixtures.ivy.IvySftpRepository
-import org.gradle.test.fixtures.server.sftp.SFTPServer
-import org.gradle.util.Requires
-import org.gradle.util.TestPrecondition
-import org.junit.Rule
+import org.gradle.integtests.fixtures.AbstractSftpDependencyResolutionTest
 
-@Requires(TestPrecondition.JDK6_OR_LATER)
-class IvySftpRepoDynamicRevisionIntegrationTest extends AbstractDependencyResolutionTest {
-
-    @Rule
-    final SFTPServer server = new SFTPServer(this)
-
-    IvySftpRepository getIvySftpRepo() {
-        new IvySftpRepository(server, '/repo')
-    }
-
+class IvySftpRepoDynamicRevisionIntegrationTest extends AbstractSftpDependencyResolutionTest {
     def "uses latest version from version range and latest status"() {
         given:
         buildFile << """
@@ -72,11 +58,13 @@ class IvySftpRepoDynamicRevisionIntegrationTest extends AbstractDependencyResolu
 
         and:
         server.expectInit()
+        server.expectStat('/repo/group/projectA/')
         server.expectDirectoryList('/repo/group/projectA/')
 
         projectA1.ivy.expectMetadataRetrieve()
         projectA1.ivy.expectFileDownload()
 
+        server.expectStat('/repo/group/projectB/')
         server.expectDirectoryList('/repo/group/projectB/')
 
         projectB1.ivy.expectMetadataRetrieve()
@@ -105,11 +93,13 @@ class IvySftpRepoDynamicRevisionIntegrationTest extends AbstractDependencyResolu
 
         and:
         server.expectInit()
+        server.expectStat('/repo/group/projectA/')
         server.expectDirectoryList('/repo/group/projectA/')
 
         projectA2.ivy.expectMetadataRetrieve()
         projectA2.ivy.expectFileDownload()
 
+        server.expectStat('/repo/group/projectB/')
         server.expectDirectoryList('/repo/group/projectB/')
 
         projectB2.ivy.expectMetadataRetrieve()

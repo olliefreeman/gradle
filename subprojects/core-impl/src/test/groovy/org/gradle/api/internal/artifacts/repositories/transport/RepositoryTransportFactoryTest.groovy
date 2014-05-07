@@ -16,15 +16,12 @@
 
 package org.gradle.api.internal.artifacts.repositories.transport
 
-import org.gradle.api.GradleException
 import org.gradle.api.InvalidUserDataException
-import org.gradle.util.Requires
-import org.gradle.util.TestPrecondition
 import spock.lang.Specification
 
 class RepositoryTransportFactoryTest extends Specification {
 
-    def repositoryTransportFactory = new RepositoryTransportFactory(null, null, null, null, null, null, null)
+    def repositoryTransportFactory = new RepositoryTransportFactory(null, null, null, null, null, null)
 
     def "cannot create a transport for url with unsupported scheme"() {
         when:
@@ -42,15 +39,5 @@ class RepositoryTransportFactoryTest extends Specification {
         then:
         InvalidUserDataException e = thrown()
         e.message == "You cannot mix different URL schemes for a single repository. Please declare separate repositories."
-    }
-
-    @Requires(TestPrecondition.JDK5)
-    def "cannot create a SFTP transport for incompatible Java version"() {
-        when:
-        repositoryTransportFactory.createTransport(['sftp'] as Set, null, null)
-
-        then:
-        GradleException e = thrown()
-        e.message == "The use of SFTP repositories requires Java 6 or later."
     }
 }

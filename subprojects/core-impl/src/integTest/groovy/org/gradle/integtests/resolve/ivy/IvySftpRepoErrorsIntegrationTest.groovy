@@ -16,22 +16,9 @@
 
 package org.gradle.integtests.resolve.ivy
 
-import org.gradle.integtests.fixtures.AbstractDependencyResolutionTest
-import org.gradle.test.fixtures.ivy.IvySftpRepository
-import org.gradle.test.fixtures.server.sftp.SFTPServer
-import org.gradle.util.Requires
-import org.gradle.util.TestPrecondition
-import org.junit.Rule
+import org.gradle.integtests.fixtures.AbstractSftpDependencyResolutionTest
 
-@Requires(TestPrecondition.JDK6_OR_LATER)
-class IvySftpRepoErrorsIntegrationTest extends AbstractDependencyResolutionTest {
-
-    @Rule final SFTPServer server = new SFTPServer(this)
-
-    IvySftpRepository getIvySftpRepo() {
-        new IvySftpRepository(server, '/repo')
-    }
-
+class IvySftpRepoErrorsIntegrationTest extends AbstractSftpDependencyResolutionTest {
     void "resolve missing dependencies from a SFTP Ivy repository"() {
         given:
         buildFile << """
@@ -87,7 +74,7 @@ class IvySftpRepoErrorsIntegrationTest extends AbstractDependencyResolutionTest 
 
         when:
         server.expectInit()
-        server.expectOpendir('/repo/org.group.name/projectA/')
+        server.expectStat('/repo/org.group.name/projectA/')
 
         then:
         fails 'retrieve'

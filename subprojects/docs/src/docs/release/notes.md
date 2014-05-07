@@ -149,6 +149,24 @@ Here is an example usage of publishing an artifact to an Ivy repository hosted o
         }
     }
 
+
+### Consumed Apache Maven POM profile activation through absence of system property
+
+On top of the support for POM profiles that [are active by default](http://books.sonatype.com/mvnref-book/reference/profiles-sect-activation.html), a profile also becomes active if the
+corresponding system property is _not_ set. The following POM file demonstrates such a use case:
+
+    <project>
+        ...
+        <profiles>
+            <profile>
+                <id>profile-1</id>
+                <property>
+                    <name>!env</name>
+                </property>
+            </profile>
+        </profiles>
+    </project>
+
 <!--
 ### Example new and noteworthy
 -->
@@ -184,6 +202,24 @@ The following are the newly deprecated items in this Gradle release. If you have
 This way the custom listeners are more robust because they can affect the test status.
 There should be no impact of this change because majority of users do not employ custom listeners
 and even if they do healthy listeners will work correctly regardless of the listeners' order.
+
+### Support for reading or setting file permissions on certain platforms with Java 5 or 6
+
+Gradle previously supported file permissions on Solaris and Linux ia-64 using Java 5 and Java 6. This support has
+been removed. You will receive a warning when attempting to use file permissions on these platforms.
+
+Note that file permissions are supported on these platforms when you use Java 7 and later, and is supported for all Java
+versions on Linux, OS X, Windows and FreeBSD for x86 and amd64 architectures.
+
+### Support for terminal integration on certain platforms
+
+Gradle previously supported terminal integration on Solaris and Linux ia-64. This support has been removed. When you use Gradle on these
+platforms, Gradle will fall back to using plain text output.
+
+Note that terminal integration is supported on Linux, OS X, Windows and FreeBSD for x86 and amd64 architectures.
+
+If you wish to have terminal integration on other platforms and architectures, please help us out with porting our
+native integration to these platforms.
 
 ### Support for the Gradle Open API removed
 
@@ -251,6 +287,7 @@ We would like to thank the following community members for making contributions 
 * [Marcin Erdmann](https://github.com/erdi) - Support an ivy repository declared with 'sftp' as the URL scheme
 * [Lukasz Kryger](https://github.com/kryger) - Documentation improvements
 * [Ben McCann](https://github.com/benmccann) - Added named 'ivy' layout to 'ivy' repositories
+* [Alex Selesse](https://github.com/selesse) - Fixed announce plugin in headless mode on OS X
 
 We love getting contributions from the Gradle community. For information on contributing, please see [gradle.org/contribute](http://gradle.org/contribute).
 

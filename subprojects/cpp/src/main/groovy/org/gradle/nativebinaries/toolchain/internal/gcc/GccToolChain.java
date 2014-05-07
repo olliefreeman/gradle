@@ -19,13 +19,14 @@ import org.gradle.api.Transformer;
 import org.gradle.api.internal.file.FileResolver;
 import org.gradle.internal.os.OperatingSystem;
 import org.gradle.internal.reflect.Instantiator;
+import org.gradle.nativebinaries.toolchain.ConfigurableToolChain;
 import org.gradle.nativebinaries.toolchain.Gcc;
 import org.gradle.nativebinaries.toolchain.internal.ToolChainAvailability;
 import org.gradle.nativebinaries.toolchain.internal.ToolType;
 import org.gradle.nativebinaries.toolchain.internal.gcc.version.GccVersionDeterminer;
 import org.gradle.nativebinaries.toolchain.internal.gcc.version.GccVersionResult;
-import org.gradle.nativebinaries.toolchain.internal.tools.DefaultTool;
-import org.gradle.nativebinaries.toolchain.internal.tools.GccToolInternal;
+import org.gradle.nativebinaries.toolchain.internal.tools.DefaultGccCommandLineToolConfiguration;
+import org.gradle.nativebinaries.toolchain.internal.tools.GccCommandLineToolConfigurationInternal;
 import org.gradle.process.internal.ExecActionFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,10 +51,10 @@ public class GccToolChain extends AbstractGccCompatibleToolChain implements Gcc 
         super(name, operatingSystem, fileResolver, execActionFactory, new GccToolSearchPath(operatingSystem), instantiator);
         this.versionDeterminer = new GccVersionDeterminer(execActionFactory);
 
-        add(new DefaultTool("cCompiler", ToolType.C_COMPILER, "gcc"));
-        add(new DefaultTool("cppCompiler", ToolType.CPP_COMPILER, "g++"));
-        add(new DefaultTool("linker", ToolType.LINKER, "g++"));
-        add(new DefaultTool("staticLibArchiver", ToolType.STATIC_LIB_ARCHIVER, "ar"));
+        add(new DefaultGccCommandLineToolConfiguration("cCompiler", ToolType.C_COMPILER, "gcc"));
+        add(new DefaultGccCommandLineToolConfiguration("cppCompiler", ToolType.CPP_COMPILER, "g++"));
+        add(new DefaultGccCommandLineToolConfiguration("linker", ToolType.LINKER, "g++"));
+        add(new DefaultGccCommandLineToolConfiguration("staticLibArchiver", ToolType.STATIC_LIB_ARCHIVER, "ar"));
     }
 
     @Override
@@ -62,11 +63,11 @@ public class GccToolChain extends AbstractGccCompatibleToolChain implements Gcc 
     }
 
     @Override
-    protected void initTools(ToolChainAvailability availability) {
+    protected void initTools(ConfigurableToolChain configurableToolChain, ToolChainAvailability availability) {
         if (versionResult == null) {
-            CommandLineToolSearchResult compiler = locate((GccToolInternal) getByName("cCompiler"));
+            CommandLineToolSearchResult compiler = locate((GccCommandLineToolConfigurationInternal) configurableToolChain.getByName("cCompiler"));
             if (!compiler.isAvailable()) {
-                compiler = locate((GccToolInternal) getByName("cppCompiler"));
+                compiler = locate((GccCommandLineToolConfigurationInternal) configurableToolChain.getByName("cppCompiler"));
             }
             availability.mustBeAvailable(compiler);
             if (!compiler.isAvailable()) {

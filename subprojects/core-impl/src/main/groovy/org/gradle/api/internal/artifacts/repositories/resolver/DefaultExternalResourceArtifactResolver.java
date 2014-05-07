@@ -16,17 +16,22 @@
 package org.gradle.api.internal.artifacts.repositories.resolver;
 
 import org.gradle.api.internal.artifacts.metadata.ModuleVersionArtifactMetaData;
-import org.gradle.api.internal.externalresource.ExternalResource;
-import org.gradle.api.internal.externalresource.MetaDataOnlyExternalResource;
-import org.gradle.api.internal.externalresource.MissingExternalResource;
+import org.gradle.api.internal.externalresource.LocallyAvailableExternalResource;
 import org.gradle.api.internal.externalresource.local.LocallyAvailableResourceCandidates;
 import org.gradle.api.internal.externalresource.local.LocallyAvailableResourceFinder;
-import org.gradle.api.internal.externalresource.metadata.ExternalResourceMetaData;
+import org.gradle.api.internal.externalresource.transfer.CacheAwareExternalResourceAccessor;
 import org.gradle.api.internal.externalresource.transport.ExternalResourceRepository;
+import org.gradle.api.internal.resource.ResourceException;
+import org.gradle.internal.UncheckedException;
+import org.gradle.internal.filestore.FileStore;
+import org.gradle.internal.resource.local.LocallyAvailableResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.List;
 
 class DefaultExternalResourceArtifactResolver implements ExternalResourceArtifactResolver {
@@ -34,72 +39,68 @@ class DefaultExternalResourceArtifactResolver implements ExternalResourceArtifac
 
     private final ExternalResourceRepository repository;
     private final LocallyAvailableResourceFinder<ModuleVersionArtifactMetaData> locallyAvailableResourceFinder;
-    private final List<String> ivyPatterns;
-    private final List<String> artifactPatterns;
-    private final boolean m2compatible;
+    private final List<ResourcePattern> ivyPatterns;
+    private final List<ResourcePattern> artifactPatterns;
+    private final FileStore<ModuleVersionArtifactMetaData> fileStore;
+    private final CacheAwareExternalResourceAccessor resourceAccessor;
 
     public DefaultExternalResourceArtifactResolver(ExternalResourceRepository repository, LocallyAvailableResourceFinder<ModuleVersionArtifactMetaData> locallyAvailableResourceFinder,
-                                                   List<String> ivyPatterns, List<String> artifactPatterns, boolean m2compatible) {
+                                                   List<ResourcePattern> ivyPatterns, List<ResourcePattern> artifactPatterns, FileStore<ModuleVersionArtifactMetaData> fileStore, CacheAwareExternalResourceAccessor resourceAccessor) {
         this.repository = repository;
         this.locallyAvailableResourceFinder = locallyAvailableResourceFinder;
         this.ivyPatterns = ivyPatterns;
         this.artifactPatterns = artifactPatterns;
-        this.m2compatible = m2compatible;
+        this.fileStore = fileStore;
+        this.resourceAccessor = resourceAccessor;
     }
 
-    public ExternalResource resolveMetaDataArtifact(ModuleVersionArtifactMetaData artifact) {
-        return findStaticResourceUsingPatterns(ivyPatterns, artifact, true);
+    public LocallyAvailableExternalResource resolveMetaDataArtifact(ModuleVersionArtifactMetaData artifact) {
+        return downloadStaticResource(ivyPatterns, artifact);
     }
 
-    public ExternalResource resolveArtifact(ModuleVersionArtifactMetaData artifact) {
-        return findStaticResourceUsingPatterns(artifactPatterns, artifact, true);
+    public LocallyAvailableExternalResource resolveArtifact(ModuleVersionArtifactMetaData artifact) {
+        return downloadStaticResource(artifactPatterns, artifact);
     }
 
     public boolean artifactExists(ModuleVersionArtifactMetaData artifact) {
-        return findStaticResourceUsingPatterns(artifactPatterns, artifact, false) != null;
+        return staticResourceExists(artifactPatterns, artifact);
     }
 
-    protected ExternalResource findStaticResourceUsingPatterns(List<String> patternList, ModuleVersionArtifactMetaData artifact, boolean forDownload) {
-        for (String pattern : patternList) {
-            ResourcePattern resourcePattern = toResourcePattern(pattern);
-            String resourceName = resourcePattern.toPath(artifact);
-            LOGGER.debug("Loading {}", resourceName);
-            ExternalResource resource = getResource(resourceName, artifact, forDownload);
-            if (resource.exists()) {
-                return resource;
-            } else {
-                LOGGER.debug("Resource not reachable for {}: res={}", artifact, resource);
-                discardResource(resource);
+    private boolean staticResourceExists(List<ResourcePattern> patternList, ModuleVersionArtifactMetaData artifact) {
+        for (ResourcePattern resourcePattern : patternList) {
+            String resourcePath = resourcePattern.toPath(artifact);
+            LOGGER.debug("Loading {}", resourcePath);
+            try {
+                if (repository.getResourceMetaData(resourcePath) != null) {
+                    return true;
+                }
+            } catch (IOException e) {
+                throw new ResourceException(String.format("Could not get resource '%s'.", resourcePath), e);
+            }
+        }
+        return false;
+    }
+
+    private LocallyAvailableExternalResource downloadStaticResource(List<ResourcePattern> patternList, final ModuleVersionArtifactMetaData artifact) {
+        for (ResourcePattern resourcePattern : patternList) {
+            String resourcePath = resourcePattern.toPath(artifact);
+            LOGGER.debug("Loading {}", resourcePath);
+            LocallyAvailableResourceCandidates localCandidates = locallyAvailableResourceFinder.findCandidates(artifact);
+            try {
+                LocallyAvailableExternalResource resource = resourceAccessor.getResource(new URI(resourcePath), new CacheAwareExternalResourceAccessor.ResourceFileStore() {
+                    public LocallyAvailableResource moveIntoCache(File downloadedResource) {
+                        return fileStore.move(artifact, downloadedResource);
+                    }
+                }, localCandidates);
+                if (resource != null) {
+                    return resource;
+                }
+            } catch (IOException e) {
+                throw new ResourceException(String.format("Could not get resource '%s'.", resourcePath), e);
+            } catch (URISyntaxException e) {
+                throw UncheckedException.throwAsUncheckedException(e);
             }
         }
         return null;
-    }
-
-    private ExternalResource getResource(String source, ModuleVersionArtifactMetaData target, boolean forDownload) {
-        try {
-            if (forDownload) {
-                LocallyAvailableResourceCandidates localCandidates = locallyAvailableResourceFinder.findCandidates(target);
-                ExternalResource resource = repository.getResource(source, localCandidates);
-                return resource == null ? new MissingExternalResource(source) : resource;
-            } else {
-                // TODO - there's a potential problem here in that we don't carry correct isLocal data in MetaDataOnlyExternalResource
-                ExternalResourceMetaData metaData = repository.getResourceMetaData(source);
-                return metaData == null ? new MissingExternalResource(source) : new MetaDataOnlyExternalResource(source, metaData);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(String.format("Could not get resource '%s'.", source), e);
-        }
-    }
-
-    private void discardResource(ExternalResource resource) {
-        try {
-            resource.close();
-        } catch (IOException e) {
-            LOGGER.warn("Exception closing resource " + resource.getName(), e);
-        }
-    }
-
-    private ResourcePattern toResourcePattern(String pattern) {
-        return m2compatible ? new M2ResourcePattern(pattern) : new IvyResourcePattern(pattern);
     }
 }

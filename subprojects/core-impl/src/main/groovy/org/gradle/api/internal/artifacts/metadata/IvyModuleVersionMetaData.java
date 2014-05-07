@@ -18,9 +18,9 @@ package org.gradle.api.internal.artifacts.metadata;
 import java.util.Map;
 
 /**
- * Additional meta-data for a module version resolved from an Ivy repository.
+ * Meta-data for a module version resolved from an Ivy repository.
  */
-public interface IvyModuleVersionMetaData {
+public interface IvyModuleVersionMetaData extends ModuleVersionMetaData {
     /**
      * Returns the extra info for the module.
      *

@@ -112,7 +112,7 @@ class IvyPublishSftpIntegrationTest extends AbstractIvyPublishIntegTest {
         'maven'  | true
     }
 
-    def "can publish to a SFTP repository with pattern layout and m2Compatible: #m2Compatible"() {
+    def "can publish to a SFTP repository with pattern layout and m2Compatible #m2Compatible"() {
         given:
         def ivySftpRepo = getIvySftpRepo(m2Compatible, "[module]/[organisation]/[revision]")
         def module = ivySftpRepo.module("org.group.name", "publish", "2")
@@ -182,7 +182,7 @@ class IvyPublishSftpIntegrationTest extends AbstractIvyPublishIntegTest {
         fails 'publish'
         failure.assertHasDescription("Execution failed for task ':publishIvyPublicationToIvyRepository'.")
                 .assertHasCause("Failed to publish publication 'ivy' to repository 'ivy'")
-                .assertHasCause("org.apache.sshd.common.SshException: SFTP error (4): Failure")
+                .assertHasCause("Could not create resource 'sftp://$ivySftpRepo.uri.host:$ivySftpRepo.uri.port/repo'.")
     }
 
     def "publishing to a SFTP repo when file uploading fails"() {
@@ -196,12 +196,13 @@ class IvyPublishSftpIntegrationTest extends AbstractIvyPublishIntegTest {
         module.jar.expectMkdirs()
         module.jar.expectOpen()
         module.jar.expectWriteFailure()
-        module.jar.expectClose()
+        // TODO - should not need this request, should be CLOSE instead
+        module.jar.expectStat()
 
         then:
         fails 'publish'
         failure.assertHasDescription("Execution failed for task ':publishIvyPublicationToIvyRepository'.")
                 .assertHasCause("Failed to publish publication 'ivy' to repository 'ivy'")
-                .assertHasCause("org.apache.sshd.common.SshException: SFTP error (4): Failure")
+                .assertHasCause("Could not write to resource 'sftp://${ivySftpRepo.uri.host}:${ivySftpRepo.uri.port}${module.jar.pathOnServer}'.")
     }
 }

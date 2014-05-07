@@ -18,38 +18,33 @@ package org.gradle.api.internal.externalresource.cached;
 import org.gradle.api.internal.externalresource.LocalFileStandInExternalResource;
 import org.gradle.api.internal.externalresource.metadata.ExternalResourceMetaData;
 import org.gradle.api.internal.externalresource.transfer.ExternalResourceAccessor;
+import org.gradle.internal.hash.HashValue;
+import org.gradle.internal.resource.local.LocallyAvailableResource;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
 
 /**
  * Creates an ExternalResource from something that has been cached locally.
  */
 public class CachedExternalResourceAdapter extends LocalFileStandInExternalResource {
-    private final CachedExternalResource cached;
+    private final LocallyAvailableResource local;
     private final ExternalResourceAccessor accessor;
+    private final HashValue expectedChecksum;
 
-    public CachedExternalResourceAdapter(String source, CachedExternalResource cached, ExternalResourceAccessor accessor) {
-        this(source, cached, accessor, null);
-    }
-
-    public CachedExternalResourceAdapter(String source, CachedExternalResource cached, ExternalResourceAccessor accessor, ExternalResourceMetaData metaData) {
-        super(source, cached.getCachedFile(), metaData);
-        this.cached = cached;
+    public CachedExternalResourceAdapter(URI source, LocallyAvailableResource local, ExternalResourceAccessor accessor, ExternalResourceMetaData remoteMetaData, HashValue expectedChecksum) {
+        super(source, local.getFile(), remoteMetaData);
+        this.local = local;
         this.accessor = accessor;
+        this.expectedChecksum = expectedChecksum;
     }
 
     @Override
-    public String toString() {
-        return "CachedResource: " + cached.getCachedFile() + " for " + getName();
-    }
-
-    public long getLastModified() {
-        return cached.getExternalLastModifiedAsTimestamp();
-    }
-
-    public long getContentLength() {
-        return cached.getContentLength();
+    public InputStream openStream() throws IOException {
+        return new FileInputStream(local.getFile());
     }
 
     public void writeTo(File destination) throws IOException {
@@ -62,14 +57,14 @@ public class CachedExternalResourceAdapter extends LocalFileStandInExternalResou
 
         // If the checksum of the downloaded file does not match the cached artifact, download it directly.
         // This may be the case if the cached artifact was changed before copying
-        if (!getSha1(destination).equals(getLocalFileSha1())) {
+        if (!getSha1(destination).equals(expectedChecksum)) {
             downloadResourceDirect(destination);
         }
     }
 
     private void downloadResourceDirect(File destination) throws IOException {
         // Perform a regular download, without considering external caches
-        accessor.getResource(getName()).writeTo(destination);
+        accessor.getResource(getURI()).writeTo(destination);
     }
 
 }

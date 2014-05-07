@@ -23,6 +23,7 @@ import org.gradle.api.internal.artifacts.repositories.transport.RepositoryTransp
 import org.gradle.api.internal.externalresource.local.LocallyAvailableResourceFinder
 import org.gradle.api.internal.externalresource.transport.ExternalResourceRepository
 import org.gradle.api.internal.file.FileResolver
+import org.gradle.api.internal.filestore.ivy.ArtifactIdentifierFileStore
 import org.gradle.logging.ProgressLoggerFactory
 import spock.lang.Specification
 
@@ -33,9 +34,10 @@ class DefaultMavenLocalRepositoryTest extends Specification {
     final LocallyAvailableResourceFinder locallyAvailableResourceFinder = Mock()
     final ExternalResourceRepository resourceRepository = Mock()
     final ResolverStrategy resolverStrategy = Stub()
+    final ArtifactIdentifierFileStore artifactIdentifierFileStore = Stub()
 
     final DefaultMavenArtifactRepository repository = new DefaultMavenLocalArtifactRepository(
-            resolver, credentials, transportFactory, locallyAvailableResourceFinder, resolverStrategy)
+            resolver, credentials, transportFactory, locallyAvailableResourceFinder, resolverStrategy, artifactIdentifierFileStore)
     final ProgressLoggerFactory progressLoggerFactory = Mock()
 
     def "creates local repository"() {
@@ -54,16 +56,12 @@ class DefaultMavenLocalRepositoryTest extends Specification {
 
         then:
         repo instanceof MavenLocalResolver
-        repo.root == "${uri}/"
+        repo.root == uri.toString()
     }
 
     private RepositoryTransport transport() {
         return Mock(RepositoryTransport) {
             getRepository() >> resourceRepository
-            convertToPath(_) >> { URI uri ->
-                def result = uri.toString()
-                return result.endsWith('/') ? result : result + '/'
-            }
         }
     }
 }

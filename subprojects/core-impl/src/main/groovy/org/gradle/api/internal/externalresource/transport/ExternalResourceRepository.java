@@ -18,7 +18,6 @@ package org.gradle.api.internal.externalresource.transport;
 
 import org.gradle.api.Nullable;
 import org.gradle.api.internal.externalresource.ExternalResource;
-import org.gradle.api.internal.externalresource.local.LocallyAvailableResourceCandidates;
 import org.gradle.api.internal.externalresource.metadata.ExternalResourceMetaData;
 
 import java.io.File;
@@ -26,20 +25,12 @@ import java.io.IOException;
 import java.util.List;
 
 public interface ExternalResourceRepository {
-
     /**
      * Attempts to fetch the given resource.
      *
      * @return null if the resource is not found.
      */
     ExternalResource getResource(String source) throws IOException;
-
-    /**
-     * Attempts to fetch the given resource.
-     *
-     * @return null if the resource is not found.
-     */
-    ExternalResource getResource(String source, @Nullable LocallyAvailableResourceCandidates localCandidates) throws IOException;
 
     /**
      * Transfer a resource to the repository
@@ -63,8 +54,9 @@ public interface ExternalResourceRepository {
      * Return a listing of resources names
      *
      * @param parent The parent directory from which to generate the listing.
-     * @return A listing of the parent directory's file content, as a List of String.
+     * @return A listing of the parent directory's file content, as a List of String. Returns null when the parent resource does not exist.
      * @throws IOException On listing failure.
      */
+    @Nullable
     List<String> list(String parent) throws IOException;
 }

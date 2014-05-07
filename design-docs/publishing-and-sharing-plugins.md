@@ -360,8 +360,9 @@ Adds the `plugins {}` DSL to build scripts (settings, init or arbitrary script n
   - ~~Cannot define local variable~~
   - ~~Cannot use GString values as string arguments to `id()` or `version()`~~
 - ~~Plugin ids contain only valid characters~~
-- ~~Plugin id cannot be empty string
-- ~~Pluginv version cannot be empty string
+- ~~Plugin id cannot begin or end with '.'~~
+- ~~Plugin id cannot be empty string~~
+- ~~Plugin version cannot be empty string~~
   
 ## Story: Can use plugins {} in build script to use core plugin
 
@@ -383,9 +384,10 @@ Note: plugins from buildSrc are not core plugins.
 - ~~`plugins { id "java" }` applies the java plugin to the project when used in a _build_ script (equally for any core plugin)~~
 - ~~`plugins { id "java" version "«anything»" }` produces error stating that core plugins cannot have version constraints~~
 - ~~`plugins { id "java"; id "java" }` produces error stating that the same plugin was specified twice~~
-- `plugins { id "org.gradle.java" }` is equivalent to `plugins { id "java" }`
+- ~~`plugins { id "org.gradle.java" }` is equivalent to `plugins { id "java" }`~~
+- ~~plugins already on the classpath (buildscript, buildSrc) are not considered core, and cannot be applied using `plugins {}`~~
 - `plugins { id "«non core plugin»" }` produces suitable 'not found' type error message
-- Using project.apply() to apply a plugin that was already applied using the plugins {} mechanism works (i.e. has no effect)
+- ~~Using project.apply() to apply a plugin that was already applied using the plugins {} mechanism works (i.e. has no effect)~~
 - Plugins are applied alphabetically based on name
 
 ### Open questions 
