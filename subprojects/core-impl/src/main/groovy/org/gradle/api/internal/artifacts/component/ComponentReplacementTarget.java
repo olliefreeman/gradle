@@ -32,18 +32,13 @@ public class ComponentReplacementTarget {
     private final Spec<ModuleIdentifier> from;
     private Collection<DependencyConflictResolver> replacementConflictResolvers;
 
-    public ComponentReplacementTarget(String from, Collection<DependencyConflictResolver> replacementConflictResolvers) {
-        final String[] split = from.split(":");
-        this.from = new Spec<ModuleIdentifier>() {
-            public boolean isSatisfiedBy(ModuleIdentifier element) {
-                return element.getGroup().equals(split[0]) && element.getName().equals(split[1]);
-            }
-        };
+    public ComponentReplacementTarget(Object fromObject, Collection<DependencyConflictResolver> replacementConflictResolvers) {
         this.replacementConflictResolvers = replacementConflictResolvers;
+        this.from = convertInput(fromObject);
     }
 
     public void into(final Object intoObject) {
-        final Spec<ModuleIdentifier> into = convertInto(intoObject);
+        final Spec<ModuleIdentifier> into = convertInput(intoObject);
 
         replacementConflictResolvers.add(new DependencyConflictResolver() {
             public Spec<ModuleVersionIdentifier> getCandidateSelector(Set<ModuleVersionIdentifier> candidates) {
@@ -83,7 +78,7 @@ public class ComponentReplacementTarget {
         });
     }
 
-    private Spec<ModuleIdentifier> convertInto(Object intoObject) {
+    private Spec<ModuleIdentifier> convertInput(Object intoObject) {
         Spec<ModuleIdentifier> into;
         if (intoObject instanceof String) {
             final String[] split = ((String) intoObject).split(":");
@@ -95,7 +90,7 @@ public class ComponentReplacementTarget {
         } else if (intoObject instanceof Closure) {
             into = new ClosureSpec((Closure) intoObject);
         } else {
-            throw new InvalidUserDataException("Don't know how to use provided component replacement 'into' value: " + intoObject);
+            throw new InvalidUserDataException("Don't know how to use provided component replacement value: " + intoObject);
         }
         return into;
     }

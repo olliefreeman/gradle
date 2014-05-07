@@ -136,13 +136,12 @@ class CustomConflictResolveIntegrationTest extends AbstractIntegrationSpec {
                 foo "org.apache.kafka:kafka_2.10:0.8.0"
                 foo "org.apache.kafka:kafka_2.9.1:0.8.1"
                 foo "org.apache.kafka:kafka_2.9.1:0.8.0"
-                foo "org.apache.kafka:kafka_2.8.0:0.8.0-beta1"
-            }
-            configurations.foo.resolutionStrategy.conflict {
-                modules { it.name.endsWith '_2.10' }
-                modules { it.name.endsWith '_2.9.1' }
-                modules { it.name.endsWith '_2.8.0' }
-                resolution { it.name.endsWith '_2.10' }
+                foo "org.apache.kafka:kafka_2.8.0:0.8.0"
+                components.replacements.from {
+                  it.name.endsWith('_2.8.0') || it.name.endsWith('_2.9.1')
+                }.into {
+                  it.name.endsWith('_2.10')
+                }
             }
 
             task check << {

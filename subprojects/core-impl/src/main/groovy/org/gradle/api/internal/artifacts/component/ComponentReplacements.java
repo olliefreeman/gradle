@@ -26,8 +26,8 @@ public class ComponentReplacements {
 
     private final List<DependencyConflictResolver> replacements = new LinkedList<DependencyConflictResolver>();
 
-    public ComponentReplacementTarget from(String moduleIdentifier) {
-        return new ComponentReplacementTarget(moduleIdentifier, replacements);
+    public ComponentReplacementTarget from(Object from) {
+        return new ComponentReplacementTarget(from, replacements);
     }
 
     public Collection<DependencyConflictResolver> toConflictResolvers() {
