@@ -111,11 +111,9 @@ class CustomConflictResolveIntegrationTest extends AbstractIntegrationSpec {
                 foo "org.springframework:spring-core:3.2.5.RELEASE"
                 foo "org.springframework:spring-core:3.2.6.RELEASE"
                 foo "org.springframework:spring-instrument:3.2.4.RELEASE"
-            }
-            configurations.foo.resolutionStrategy.conflict {
-                modules 'org.springframework:spring'
-                modules { it.group == 'org.springframework' && it.name.startsWith('spring-') }
-                resolution { it.name.startsWith 'spring-' }
+                components.replacements.from('org.springframework:spring').into {
+                  it.group == 'org.springframework' && it.name.startsWith('spring-')
+                }
             }
 
             task check << {

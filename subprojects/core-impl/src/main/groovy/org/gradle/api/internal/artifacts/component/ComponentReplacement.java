@@ -16,12 +16,27 @@
 
 package org.gradle.api.internal.artifacts.component;
 
-public class ComponentReplacement {
+import org.gradle.api.artifacts.ModuleIdentifier;
+import org.gradle.api.artifacts.ModuleVersionIdentifier;
+import org.gradle.api.internal.artifacts.configurations.DependencyConflictResolver;
+import org.gradle.api.specs.Spec;
+
+import java.util.Set;
+
+public class ComponentReplacement implements DependencyConflictResolver {
     final String from;
     final String into;
 
     public ComponentReplacement(String from, String into) {
         this.from = from;
         this.into = into;
+    }
+
+    public Spec<ModuleVersionIdentifier> getCandidateSelector(Set<ModuleVersionIdentifier> candidates) {
+        return null;
+    }
+
+    public Spec<ModuleIdentifier> getConflictingModulesSelector(ModuleIdentifier module) {
+        return null;
     }
 }

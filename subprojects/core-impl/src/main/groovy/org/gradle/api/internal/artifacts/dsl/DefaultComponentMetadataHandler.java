@@ -23,8 +23,6 @@ import org.gradle.api.artifacts.ComponentMetadataDetails;
 import org.gradle.api.artifacts.IvyModuleDescriptor;
 import org.gradle.api.artifacts.dsl.ComponentMetadataHandler;
 import org.gradle.api.internal.artifacts.ModuleMetadataProcessor;
-import org.gradle.api.internal.artifacts.component.ComponentReplacement;
-import org.gradle.api.internal.artifacts.component.ComponentReplacementConfigurer;
 import org.gradle.api.internal.artifacts.component.ComponentReplacements;
 import org.gradle.api.internal.artifacts.ivyservice.DefaultIvyModuleDescriptor;
 import org.gradle.api.internal.artifacts.ivyservice.ModuleVersionResolveException;
