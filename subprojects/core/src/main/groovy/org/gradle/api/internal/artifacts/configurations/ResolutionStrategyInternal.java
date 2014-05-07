@@ -55,6 +55,4 @@ public interface ResolutionStrategyInternal extends ResolutionStrategy {
      * @return copy of this resolution strategy. See the contract of {@link org.gradle.api.artifacts.Configuration#copy()}.
      */
     ResolutionStrategyInternal copy();
-
-    List<DependencyConflictResolver> getDependencyConflictResolvers();
 }
