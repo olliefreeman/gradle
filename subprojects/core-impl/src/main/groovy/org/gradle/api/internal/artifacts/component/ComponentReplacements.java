@@ -16,10 +16,39 @@
 
 package org.gradle.api.internal.artifacts.component;
 
+import org.gradle.api.artifacts.ModuleIdentifier;
+import org.gradle.api.artifacts.ModuleVersionIdentifier;
+import org.gradle.api.internal.artifacts.DefaultModuleIdentifier;
+import org.gradle.api.internal.artifacts.configurations.DependencyConflictResolver;
+import org.gradle.api.internal.artifacts.ivyservice.resolutionstrategy.DefaultDependencyConflictDetails;
+import org.gradle.api.specs.Spec;
+
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
+
 public class ComponentReplacements {
 
-    public ComponentReplacement from(String moduleIdentifier) {
-        return new ComponentReplacement(moduleIdentifier);
+    private final List<ComponentReplacement> replacements = new LinkedList<ComponentReplacement>();
+
+    public ComponentReplacementConfigurer from(String moduleIdentifier) {
+        return new ComponentReplacementConfigurer(moduleIdentifier, replacements);
     }
 
+    public Collection<DependencyConflictResolver> toConflictResolvers() {
+        Collection<DependencyConflictResolver> out = new LinkedList<DependencyConflictResolver>();
+        for (ComponentReplacement replacement : replacements) {
+            final String[] split = replacement.into.toString().split(":");
+            Spec<ModuleVersionIdentifier> resolution = new Spec<ModuleVersionIdentifier>() {
+                public boolean isSatisfiedBy(ModuleVersionIdentifier element) {
+                    return element.getGroup().equals(split[0]) && element.getName().equals(split[1]);
+                }
+            };
+            DefaultDependencyConflictDetails d = new DefaultDependencyConflictDetails();
+            d.modules(replacement.from, replacement.into).resolution(resolution);
+            out.add(d);
+        }
+
+        return out;
+    }
 }

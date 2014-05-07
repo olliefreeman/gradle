@@ -22,12 +22,13 @@ import org.gradle.api.specs.Spec;
 
 import java.util.Set;
 
-//declares conflicts and provides means to resolve them. Is applicable to given ModuleIdentifier.
-public interface DependencyConflictResolver extends Spec<ModuleIdentifier> {
+public interface DependencyConflictResolver {
 
     //provides a spec that can select from given candidates. Resulting spec must match at least one of the candidates.
+    //returns null if this resolver is not designed to handle given candidates
     Spec<ModuleVersionIdentifier> getCandidateSelector(Set<ModuleVersionIdentifier> candidates);
 
     //provides a spec that can select conflicting modules for given module.
+    //returns null if this resolver is not designed to handle given candidates
     Spec<ModuleIdentifier> getConflictingModulesSelector(ModuleIdentifier module);
 }

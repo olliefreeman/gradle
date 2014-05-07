@@ -23,6 +23,8 @@ import org.gradle.api.artifacts.ComponentMetadataDetails;
 import org.gradle.api.artifacts.IvyModuleDescriptor;
 import org.gradle.api.artifacts.dsl.ComponentMetadataHandler;
 import org.gradle.api.internal.artifacts.ModuleMetadataProcessor;
+import org.gradle.api.internal.artifacts.component.ComponentReplacement;
+import org.gradle.api.internal.artifacts.component.ComponentReplacementConfigurer;
 import org.gradle.api.internal.artifacts.component.ComponentReplacements;
 import org.gradle.api.internal.artifacts.ivyservice.DefaultIvyModuleDescriptor;
 import org.gradle.api.internal.artifacts.ivyservice.ModuleVersionResolveException;
@@ -32,7 +34,7 @@ import org.gradle.api.internal.artifacts.repositories.resolver.ComponentMetadata
 import org.gradle.internal.reflect.Instantiator;
 import org.gradle.listener.ActionBroadcast;
 
-import java.util.List;
+import java.util.*;
 
 public class DefaultComponentMetadataHandler implements ComponentMetadataHandler, ModuleMetadataProcessor {
     private final Instantiator instantiator;

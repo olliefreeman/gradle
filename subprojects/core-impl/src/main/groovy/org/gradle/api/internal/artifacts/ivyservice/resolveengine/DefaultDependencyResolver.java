@@ -101,7 +101,7 @@ public class DefaultDependencyResolver implements ArtifactDependencyResolver {
                 }
                 conflictResolver = new VersionSelectionReasonResolver(conflictResolver);
 
-                ModuleConflictHandler handler = new DefaultModuleConflictHandler(conflictResolver, configuration.getResolutionStrategy().getDependencyConflictResolvers());
+                ModuleConflictHandler handler = new DefaultModuleConflictHandler(conflictResolver, metadataProcessor.getReplacements().toConflictResolvers());
 
                 DependencyGraphBuilder builder = new DependencyGraphBuilder(idResolver, projectDependencyResolver, artifactResolver, handler, new DefaultDependencyToConfigurationResolver());
 

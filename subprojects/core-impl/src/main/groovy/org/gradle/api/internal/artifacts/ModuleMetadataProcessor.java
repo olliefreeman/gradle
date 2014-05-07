@@ -15,8 +15,10 @@
  */
 package org.gradle.api.internal.artifacts;
 
+import org.gradle.api.internal.artifacts.component.ComponentReplacements;
 import org.gradle.api.internal.artifacts.metadata.ModuleVersionMetaData;
 
 public interface ModuleMetadataProcessor {
     void process(ModuleVersionMetaData metadata);
+    ComponentReplacements getReplacements();
 }

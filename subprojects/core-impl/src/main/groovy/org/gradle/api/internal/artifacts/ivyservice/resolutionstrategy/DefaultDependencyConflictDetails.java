@@ -36,11 +36,21 @@ public class DefaultDependencyConflictDetails implements DependencyConflictDetai
     private Spec<ModuleVersionIdentifier> resolutionSpec;
 
     public Spec<ModuleVersionIdentifier> getCandidateSelector(Set<ModuleVersionIdentifier> candidates) {
+        for (Spec<ModuleIdentifier> conflict : conflicts) {
+            //each conflict selector needs to be 'satisfied' to ensure this conflict resolver handles this particular candidate set
+            boolean found = false;
+            for (ModuleVersionIdentifier candidate : candidates) {
+                if (conflict.isSatisfiedBy(candidate.getModule())) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                //at least one conflict selector is not applicable for given candidate set
+                return null;
+            }
+        }
         return resolutionSpec;
-    }
-
-    public boolean isSatisfiedBy(ModuleIdentifier element) {
-        return new OrSpec<ModuleIdentifier>(conflicts).isSatisfiedBy(element);
     }
 
     public Spec<ModuleIdentifier> getConflictingModulesSelector(ModuleIdentifier module) {
@@ -52,7 +62,7 @@ public class DefaultDependencyConflictDetails implements DependencyConflictDetai
             }
         }
         if (match == null) {
-            return Specs.satisfyNone();
+            return null;
         }
         Set<ModuleIdentifier> out = new HashSet<ModuleIdentifier>((Set) conflicts);
         out.remove(match);
@@ -60,7 +70,7 @@ public class DefaultDependencyConflictDetails implements DependencyConflictDetai
     }
 
     public DependencyConflictDetails modules(Object... module) {
-        for (Object m : module) {
+        for (final Object m : module) {
             if (m instanceof CharSequence) {
                 final String[] split = m.toString().split(":");
                 conflicts.add(new Spec<ModuleIdentifier>() {

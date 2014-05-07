@@ -19,7 +19,7 @@ import org.gradle.integtests.fixtures.AbstractIntegrationSpec
 
 class CustomConflictResolveIntegrationTest extends AbstractIntegrationSpec {
 
-    def "selects guava over google collections"() {
+    def "selects highest guava over google collections"() {
         buildFile << """
             repositories { mavenCentral() }
             configurations { foo }
@@ -49,10 +49,7 @@ class CustomConflictResolveIntegrationTest extends AbstractIntegrationSpec {
             dependencies {
                 foo "com.google.guava:guava:16.0.1"
                 foo "com.google.guava:guava:15.0.0"
-            }
-            configurations.foo.resolutionStrategy.conflict {
-                modules('com.google.guava:guava', 'com.google.collections:google-collections')
-                resolution { it.name == 'guava' }
+                components.replacements.from('com.google.collections:google-collections').into('com.google.guava:guava')
             }
             task check << {
                 assert configurations.foo.files*.name == ['guava-16.0.1.jar']
@@ -63,18 +60,14 @@ class CustomConflictResolveIntegrationTest extends AbstractIntegrationSpec {
         run "dependencies"
     }
 
-    def "selects highest version of guava"() {
+    def "ignores replacement if only older version on classpath"() {
         buildFile << """
             repositories { mavenCentral() }
             configurations { foo }
             dependencies {
-                foo "com.google.collections:google-collections:1.0"
                 foo "com.google.guava:guava:16.0.1"
                 foo "com.google.guava:guava:15.0.0"
-            }
-            configurations.foo.resolutionStrategy.conflict {
-                modules('com.google.guava:guava', 'com.google.collections:google-collections')
-                resolution { it.name == 'guava' }
+                components.replacements.from('com.google.guava:guava').into('com.google.collections:google-collections')
             }
             task check << {
                 assert configurations.foo.files*.name == ['guava-16.0.1.jar']
@@ -93,10 +86,7 @@ class CustomConflictResolveIntegrationTest extends AbstractIntegrationSpec {
                 foo "com.google.collections:google-collections:1.0"
                 foo "com.google.guava:guava:16.0.1"
                 foo "com.google.guava:guava:15.0.0"
-            }
-            configurations.foo.resolutionStrategy.conflict {
-                modules('com.google.guava:guava', 'com.google.collections:google-collections')
-                resolution { it.name == 'google-collections' }
+                components.replacements.from('com.google.guava:guava').into('com.google.collections:google-collections')
             }
 
             task check << {

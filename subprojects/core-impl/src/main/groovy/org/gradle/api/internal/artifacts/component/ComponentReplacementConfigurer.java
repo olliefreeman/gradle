@@ -16,12 +16,18 @@
 
 package org.gradle.api.internal.artifacts.component;
 
-public class ComponentReplacement {
-    final String from;
-    final String into;
+import java.util.Collection;
 
-    public ComponentReplacement(String from, String into) {
+public class ComponentReplacementConfigurer {
+    private final String from;
+    private Collection<ComponentReplacement> allReplacements;
+
+    public ComponentReplacementConfigurer(String from, Collection<ComponentReplacement> allReplacements) {
         this.from = from;
-        this.into = into;
+        this.allReplacements = allReplacements;
+    }
+
+    public void into(String into) {
+        allReplacements.add(new ComponentReplacement(from, into));
     }
 }

@@ -16,7 +16,6 @@
 
 package org.gradle.api.internal.artifacts.ivyservice.resolveengine;
 
-import org.apache.ivy.core.module.id.ModuleId;
 import org.gradle.api.artifacts.ModuleIdentifier;
 import org.gradle.api.artifacts.ModuleVersionIdentifier;
 import org.gradle.api.internal.artifacts.configurations.DependencyConflictResolver;
@@ -24,7 +23,6 @@ import org.gradle.api.specs.Spec;
 import org.gradle.api.specs.Specs;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -41,10 +39,9 @@ public class DefaultModuleConflictHandler implements ModuleConflictHandler {
     public <T extends ModuleRevisionResolveState> T select(Collection<? extends T> candidates) {
         Collection<T> filteredCandidates = new HashSet<T>(candidates);
         for (DependencyConflictResolver resolver : resolvers) {
-            //checks if given resolver can be applied to *all* incoming *candidates* (not filtered)
-            if (areHandledByGivenResolver(candidates, resolver)) {
-                //get selector for given filtered candidates
-                Spec<ModuleVersionIdentifier> selector = resolver.getCandidateSelector(toModuleVersionsSet(filteredCandidates));
+            //get selector for given filtered candidates
+            Spec<ModuleVersionIdentifier> selector = resolver.getCandidateSelector(toModuleVersionsSet(filteredCandidates));
+            if (selector != null) {
                 //filter candidates
                 filteredCandidates = applyFilter(selector, filteredCandidates);
             }
@@ -57,8 +54,9 @@ public class DefaultModuleConflictHandler implements ModuleConflictHandler {
 
     public Spec<ModuleIdentifier> getModuleConflicts(ModuleIdentifier module) {
         for (DependencyConflictResolver resolver : resolvers) {
-            if (resolver.isSatisfiedBy(module)) {
-                return resolver.getConflictingModulesSelector(module);
+            Spec<ModuleIdentifier> selector = resolver.getConflictingModulesSelector(module);
+            if (selector != null) {
+                return selector;
             }
         }
         return Specs.satisfyNone();
@@ -80,15 +78,5 @@ public class DefaultModuleConflictHandler implements ModuleConflictHandler {
             out.add(c.getSelectedId());
         }
         return out;
-    }
-
-    //checks if every candidate is handled by given resolver
-    private static <T extends ModuleRevisionResolveState> boolean areHandledByGivenResolver(Collection<? extends T> candidates, DependencyConflictResolver resolver) {
-        for (T candidate : candidates) {
-            if (!resolver.isSatisfiedBy(candidate.getSelectedId().getModule())) {
-                return false;
-            }
-        }
-        return true;
     }
 }
