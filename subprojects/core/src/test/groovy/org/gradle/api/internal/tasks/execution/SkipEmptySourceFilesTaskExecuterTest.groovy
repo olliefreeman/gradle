@@ -46,7 +46,7 @@ class SkipEmptySourceFilesTaskExecuterTest extends Specification {
         executer.execute(task, state, executionContext)
 
         then:
-        1 * state.upToDate()
+        1 * state.skipped("NO-FILES")
         0 * target._
         0 * state._
     }

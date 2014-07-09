@@ -138,7 +138,7 @@ sourceSets.test.output.dir "$buildDir/generatedTestResources", builtBy: 'generat
         //when
         def result = usingBuildFile(buildFile).withTasks("classes").run();
         //then
-        result.assertTasksExecuted(":compileJava", ":generateResource", ":processResources", ":classes")
+        result.assertTasksExecuted(":generateResource", ":classes")
 
         //when
         result = usingBuildFile(buildFile).withTasks("testClasses").run();
@@ -255,7 +255,7 @@ interface Person { }
 """
 
         def result = inTestDirectory().withTasks("a:classes").run()
-        result.assertTasksExecuted(":b:compileJava", ":b:processResources", ":b:classes", ":b:jar", ":a:compileJava", ":a:processResources", ":a:classes")
+        result.assertTasksExecuted(":b:compileJava", ":b:classes", ":b:jar", ":a:compileJava", ":a:classes")
     }
 
     @Test

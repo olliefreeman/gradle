@@ -102,7 +102,7 @@ task sayHearthyGoodbye << {
 
     void available(String theUrl) {
         URL url = new URL(theUrl)
-        long expiry = System.currentTimeMillis() + 30000
+        long expiry = System.currentTimeMillis() + 60000
         while (System.currentTimeMillis() <= expiry) {
             try {
                 url.text
